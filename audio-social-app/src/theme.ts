@@ -1,18 +1,67 @@
-const theme = {
+export const theme = {
   colors: {
-    background: '#F9FAFC', // Clean off-white with slight cool undertone
-    text: '#2D3047', // Deep navy-charcoal for text, sophisticated alternative to black
-    primary: '#FF9F1C', // Vibrant amber/orange - energetic, warm, distinctive
-    secondary: '#2EC4B6', // Teal blue - cool complement to the warm primary
-    accent: '#E71D36', // Bright crimson for important highlights and actions
-    lightText: '#7D8597', // Muted slate for secondary text
-    border: '#E6E8ED', // Subtle cool-toned border
-    highlight: '#FFF1E0', // Soft amber tint for highlighting elements
-    success: '#4CB963', // Fresh green for confirmations
-    warning: '#F4D35E', // Gold for caution states, coordinates with primary
-    error: '#E63946', // Ruby red for errors
-    darkPrimary: '#E08700', // Darker amber for pressed states
-    lightPrimary: '#FFEFD1', // Light amber for backgrounds and hover states
+    primary: '#2ECC71', // Verde brillante y moderno
+    secondary: '#27AE60', // Verde más oscuro y elegante
+    accent: '#00D2D3', // Cian brillante para contraste
+    background: '#FFFFFF', // Blanco
+    surface: '#F5F6FA', // Gris muy claro
+    text: '#2C3E50', // Azul oscuro casi negro
+    textSecondary: '#7F8C8D', // Gris azulado
+    error: '#E74C3C', // Rojo
+    success: '#2ECC71', // Verde brillante
+    warning: '#F1C40F', // Amarillo
+    border: '#D6DBDF', // Gris claro
+    card: '#FFFFFF', // Blanco
+    notification: '#2ECC71', // Verde brillante
+    lightText: '#7F8C8D', // Gris azulado
+    darkText: '#2C3E50', // Azul oscuro casi negro
+    highlight: '#00D2D3', // Cian brillante para resaltar
+    shadow: '#2ECC71', // Verde brillante para sombras
+  },
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+  },
+  borderRadius: {
+    small: 4,
+    medium: 8,
+    large: 16,
+    round: 9999,
+  },
+  typography: {
+    h1: {
+      fontSize: 32,
+      fontWeight: '700',
+      fontFamily: 'Inter-Bold',
+    },
+    h2: {
+      fontSize: 24,
+      fontWeight: '600',
+      fontFamily: 'Inter-SemiBold',
+    },
+    h3: {
+      fontSize: 20,
+      fontWeight: '600',
+      fontFamily: 'Inter-SemiBold',
+    },
+    body: {
+      fontSize: 16,
+      fontWeight: '400',
+      fontFamily: 'Inter-Regular',
+    },
+    caption: {
+      fontSize: 14,
+      fontWeight: '400',
+      fontFamily: 'Inter-Light',
+    },
+    button: {
+      fontSize: 16,
+      fontWeight: '600',
+      fontFamily: 'Inter-SemiBold',
+    },
   },
 };
 
@@ -41,6 +90,4 @@ const audioCardStyle = {
   },
 };
 
-
-
-export { theme, audioCardStyle };
+export { audioCardStyle };

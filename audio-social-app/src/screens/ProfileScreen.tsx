@@ -32,6 +32,7 @@ interface Ally {
   _id: string;
   name: string;
   profilePicture?: string;
+  username?: string;
 }
 
 // Union type for all possible data types that can be used in the FlatList
@@ -81,7 +82,7 @@ export default function ProfileScreen() {
         fetchUserPosts(data._id),
         fetchGeneralPosts(data._id),
         fetchCreatedCommunities(data._id),
-        fetchJoinedCommunities(token),
+        fetchJoinedCommunities(),
         fetchAllies(token)
       ]);
       
@@ -123,61 +124,34 @@ export default function ProfileScreen() {
     }
   };
 
-  const fetchJoinedCommunities = async (token: string) => {
+  const fetchJoinedCommunities = async () => {
     try {
-      console.log('🔍 Obteniendo comunidades suscritas...');
-      
-      // Get the user's active subscriptions
-      const subscriptionsResponse = await axios.get(`${API_URL}/api/subscriptions/by-user`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const token = await AsyncStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/subscriptions/by-user`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
-      
-      console.log(`🔍 Suscripciones encontradas: ${subscriptionsResponse.data.length}`);
-      
-      // Extract community IDs from subscriptions
-      const communityIds = subscriptionsResponse.data
-        .filter((subscription: any) => subscription.status === 'active' && subscription.community)
-        .map((subscription: any) => subscription.community);
-      
-      console.log(`🔍 IDs de comunidades a buscar: ${communityIds.length}`);
-      
-      if (communityIds.length === 0) {
-        console.log('ℹ️ No hay comunidades suscritas activas');
-        setCommunitiesJoined([]);
-        return;
+      if (!response.ok) {
+        throw new Error('Error al obtener comunidades suscritas');
       }
-      
-      // Fetch details for each community
-      const communitiesPromises = communityIds.map((communityId: string) => 
-        axios.get(`${API_URL}/api/communities/${communityId}`)
-          .then(response => response.data)
-          .catch(error => {
-            console.error(`Error fetching community ${communityId}:`, error);
-            return null;
-          })
-      );
-      
-      const communities = await Promise.all(communitiesPromises);
-      const validCommunities = communities.filter(community => community != null);
-      
-      console.log(`✅ ${validCommunities.length} comunidades suscritas cargadas`);
-      setCommunitiesJoined(validCommunities);
-      
+      const data = await response.json();
+      setCommunitiesJoined(data);
     } catch (error) {
-      console.error('❌ Error al obtener comunidades suscritas:', error);
+      console.error('Error al obtener comunidades suscritas:', error);
       setCommunitiesJoined([]);
     }
   };
 
   const fetchAllies = async (token: string) => {
     try {
-      const res = await axios.get(`${API_URL}/api/allies/my-allies`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await axios.get(`${API_URL}/api/allies/my-allies`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      console.log(`✅ ${res.data.length} aliados cargados`);
-      setAllies(res.data);
+      setAllies(response.data.allies);
     } catch (error) {
-      console.error('❌ Error al obtener aliados:', error);
+      console.error('Error al cargar aliados:', error);
+      setAllies([]);
     }
   };
 
@@ -192,7 +166,11 @@ export default function ProfileScreen() {
     if (activeTab === 'posts' || activeTab === 'general') {
       const postItem = item as Post;
       return (
-        <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('PostDetail', { postId: postItem._id })}>
+        <TouchableOpacity 
+          key={`post-${postItem._id}`}
+          style={styles.card} 
+          onPress={() => navigation.navigate('PostDetail', { postId: postItem._id })}
+        >
           {postItem.media?.[0] && (
             <Image 
               source={{ uri: formatImageUrl(postItem.media[0].url) }} 
@@ -209,6 +187,7 @@ export default function ProfileScreen() {
       const communityItem = item as Community;
       return (
         <TouchableOpacity 
+          key={`community-${communityItem._id}`}
           style={styles.communityCard} 
           onPress={() => navigation.navigate('Community', { communityId: communityItem._id })}
         >
@@ -228,20 +207,6 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </View>
-        </TouchableOpacity>
-      );
-    } else if (activeTab === 'allies') {
-      const allyItem = item as Ally;
-      return (
-        <TouchableOpacity 
-          style={styles.allyCard} 
-          onPress={() => navigation.navigate('UserProfile', { userId: allyItem._id })}
-        >
-          <Image 
-            source={{ uri: formatImageUrl(allyItem.profilePicture, 'https://via.placeholder.com/100') }} 
-            style={styles.allyImage} 
-          />
-          <Text style={styles.allyName}>{allyItem.name}</Text>
         </TouchableOpacity>
       );
     }
@@ -281,14 +246,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView 
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-          />
-        }
-      >
+      <View style={styles.content}>
         <Image 
           source={{ uri: formatImageUrl(user?.bannerImage) }} 
           style={styles.banner} 
@@ -397,31 +355,71 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        <View style={styles.contentContainer}>
-          {getCurrentData().length > 0 ? (
-            <FlatList
-              data={getCurrentData()}
-              keyExtractor={(item) => item._id}
-              renderItem={renderItem}
-              scrollEnabled={false}
-              nestedScrollEnabled={true}
-            />
-          ) : (
-            <View style={styles.emptyStateContainer}>
-              <Ionicons name="alert-circle-outline" size={60} color="#ccc" />
-              <Text style={styles.emptyStateText}>{getEmptyMessage()}</Text>
-              {activeTab === 'created' && (
-                <TouchableOpacity 
-                  style={styles.createButton}
-                  onPress={() => navigation.navigate('CreateCommunity')}
-                >
-                  <Text style={styles.createButtonText}>Crear comunidad</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </View>
-      </ScrollView>
+        {activeTab === 'allies' ? (
+          <View style={styles.contentContainer}>
+            {allies.length > 0 ? (
+              <FlatList
+                data={allies}
+                keyExtractor={(item) => item._id}
+                numColumns={2}
+                key="allies-grid"
+                renderItem={({ item }) => (
+                  <TouchableOpacity 
+                    style={styles.allyCard}
+                    onPress={() => navigation.navigate('UserProfile', { userId: item._id })}
+                  >
+                    <Image 
+                      source={{ uri: formatImageUrl(item.profilePicture) }} 
+                      style={styles.allyAvatar} 
+                    />
+                    <Text style={styles.allyName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.allyUsername} numberOfLines={1}>@{item.username}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <Ionicons name="people-outline" size={60} color="#ccc" />
+                <Text style={styles.emptyStateText}>
+                  No tienes aliados todavía. Únete a comunidades para conocer gente nueva.
+                </Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={styles.contentContainer}>
+            {getCurrentData().length > 0 ? (
+              <FlatList
+                data={getCurrentData()}
+                keyExtractor={(item) => `${activeTab}-${item._id}`}
+                key={`list-${activeTab}`}
+                renderItem={renderItem}
+                scrollEnabled={true}
+                nestedScrollEnabled={true}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                  />
+                }
+              />
+            ) : (
+              <View style={styles.emptyStateContainer}>
+                <Ionicons name="alert-circle-outline" size={60} color="#ccc" />
+                <Text style={styles.emptyStateText}>{getEmptyMessage()}</Text>
+                {activeTab === 'created' && (
+                  <TouchableOpacity 
+                    style={styles.createButton}
+                    onPress={() => navigation.navigate('CreateCommunity')}
+                  >
+                    <Text style={styles.createButtonText}>Crear comunidad</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -430,6 +428,9 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     backgroundColor: theme.colors.background 
+  },
+  content: {
+    flex: 1,
   },
   loadingContainer: { 
     flex: 1, 
@@ -592,24 +593,34 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   allyCard: {
+    flex: 1,
+    margin: 8,
     backgroundColor: '#fff',
     borderRadius: 10,
-    padding: 15,
-    marginBottom: 10,
-    flexDirection: 'row',
+    padding: 12,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#eee',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  allyImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 15,
+  allyAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 8,
   },
   allyName: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    textAlign: 'center',
+  },
+  allyUsername: {
+    fontSize: 12,
+    color: theme.colors.lightText,
+    textAlign: 'center',
   },
   aboutSection: {
     padding: 15,

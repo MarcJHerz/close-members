@@ -28,6 +28,39 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+// 🔹 Función para hacer aliados automáticamente
+const makeAllies = async (userId, communityId) => {
+  try {
+    // Obtener todos los miembros de la comunidad
+    const community = await Community.findById(communityId).populate('members', '_id');
+    const members = community.members.map(m => m._id);
+
+    // Crear relaciones de aliados con cada miembro
+    for (const memberId of members) {
+      if (memberId.toString() !== userId.toString()) {
+        // Verificar si ya son aliados en cualquier dirección
+        const existingAlly = await Ally.findOne({
+          $or: [
+            { user1: userId, user2: memberId },
+            { user1: memberId, user2: userId }
+          ]
+        });
+
+        if (!existingAlly) {
+          // Crear relación unidireccional
+          await new Ally({
+            user1: userId,
+            user2: memberId
+          }).save();
+          console.log(`✅ Relación de aliados creada entre ${userId} y ${memberId}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error al crear aliados automáticamente:', error);
+  }
+};
+
 // ✅ Crear una nueva comunidad
 router.post('/create', verifyToken, upload.single('coverImage'), async (req, res) => {
   try {
@@ -94,35 +127,27 @@ router.get('/created-by/:userId', async (req, res) => {
   res.json(communities);
 });
 
-
-router.post('/:id/join', verifyToken, async (req, res) => {
+// 🔹 Unirse a una comunidad
+router.post('/join/:communityId', verifyToken, async (req, res) => {
   try {
-    const community = await Community.findById(req.params.id);
-    if (!community) return res.status(404).json({ error: 'Comunidad no encontrada' });
-
-    if (!community.members.includes(req.userId)) {
-      community.members.push(req.userId);
-      await community.save();
+    const community = await Community.findById(req.params.communityId);
+    if (!community) {
+      return res.status(404).json({ error: 'Comunidad no encontrada' });
     }
 
-    for (const memberId of community.members) {
-      if (memberId.toString() !== req.userId) {
-        await Ally.updateOne(
-          { user1: req.userId, user2: memberId },
-          { user1: req.userId, user2: memberId },
-          { upsert: true }
-        );
-        await Ally.updateOne(
-          { user1: memberId, user2: req.userId },
-          { user1: memberId, user2: req.userId },
-          { upsert: true }
-        );
-      }
+    if (community.members.includes(req.userId)) {
+      return res.status(400).json({ error: 'Ya eres miembro de esta comunidad' });
     }
 
-    res.json({ message: 'Te has unido a la comunidad', community });
+    community.members.push(req.userId);
+    await community.save();
+
+    // Hacer aliados automáticamente
+    await makeAllies(req.userId, community._id);
+
+    res.json({ message: 'Te has unido a la comunidad exitosamente' });
   } catch (error) {
-    console.error('❌ Error al unirse a la comunidad:', error);
+    console.error('Error al unirse a la comunidad:', error);
     res.status(500).json({ error: 'Error al unirse a la comunidad' });
   }
 });
@@ -188,5 +213,18 @@ router.put('/:id/update', verifyToken, upload.single('coverImage'), async (req, 
   }
 });
 
+// 🔹 Obtener comunidades a las que se ha unido un usuario
+router.get('/joined-by/:userId', async (req, res) => {
+  try {
+    const communities = await Community.find({ 
+      members: req.params.userId 
+    }).select('name description coverImage members');
+    
+    res.json(communities);
+  } catch (error) {
+    console.error('Error al obtener comunidades unidas:', error);
+    res.status(500).json({ error: 'Error al obtener comunidades unidas' });
+  }
+});
 
 module.exports = router;

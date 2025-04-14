@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const Subscription = require('../models/Subscription');
 const Community = require('../models/Community');
 const verifyToken = require('../middleware/authMiddleware');
+const Ally = require('../models/Ally');
 
 // 📌 Suscribirse a una comunidad
 router.post('/subscribe', verifyToken, async (req, res) => {
@@ -205,6 +206,28 @@ router.post('/:id/join', verifyToken, async (req, res) => {
       community.members.push(userId);
       await community.save();
       console.log(`✅ Usuario añadido como miembro de la comunidad`);
+
+      // Crear relaciones de aliados con los miembros existentes
+      for (const memberId of community.members) {
+        if (memberId.toString() !== userId.toString()) {
+          // Verificar si ya son aliados
+          const existingAlly = await Ally.findOne({
+            $or: [
+              { user1: userId, user2: memberId },
+              { user1: memberId, user2: userId }
+            ]
+          });
+
+          if (!existingAlly) {
+            // Crear relación de aliados
+            await new Ally({
+              user1: userId,
+              user2: memberId
+            }).save();
+            console.log(`✅ Relación de aliados creada entre ${userId} y ${memberId}`);
+          }
+        }
+      }
     }
 
     res.json({ 

@@ -7,6 +7,7 @@ const router = express.Router();
 const Post = require('../models/Post');
 const Community = require('../models/Community');
 const verifyToken = require('../middleware/authMiddleware');
+const Ally = require('../models/Ally');
 
 
 // 📦 Crear carpeta si no existe
@@ -188,17 +189,28 @@ router.get('/feed/alliances', verifyToken, async (req, res) => {
     const userId = req.userId;
 
     // Obtener aliados del usuario autenticado
-    const allies = await require('../models/Ally').find({ user1: userId }).populate('user2', '_id');
-    const allyIds = allies.map(a => a.user2._id.toString());
+    const allies = await Ally.find({
+      $or: [
+        { user1: userId },
+        { user2: userId }
+      ]
+    }).populate('user1', '_id').populate('user2', '_id');
+
+    // Obtener IDs de todos los aliados
+    const allyIds = allies.map(a => {
+      return a.user1._id.toString() === userId.toString() 
+        ? a.user2._id.toString() 
+        : a.user1._id.toString();
+    });
 
     // Incluir también al usuario actual en el feed
     const allUserIds = [...allyIds, userId];
 
     const posts = await Post.find({
-      user: { $in: allUserIds },
-      community: null, // Solo publicaciones generales
+      user: { $in: allUserIds }
     })
       .populate('user', 'name profilePicture')
+      .populate('community', 'name')
       .sort({ createdAt: -1 });
 
     res.json(posts);
