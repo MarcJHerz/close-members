@@ -5,6 +5,7 @@ export const theme = {
     accent: '#00D2D3', // Cian brillante para contraste
     background: '#FFFFFF', // Blanco
     surface: '#F5F6FA', // Gris muy claro
+    surfaceVariant: '#E8E9ED', // Agregado para variante de superficie
     text: '#2C3E50', // Azul oscuro casi negro
     textSecondary: '#7F8C8D', // Gris azulado
     error: '#E74C3C', // Rojo

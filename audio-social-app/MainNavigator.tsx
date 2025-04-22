@@ -130,10 +130,10 @@ function RootNavigator() {
       <Stack.Screen name="Home" component={BottomTabs} options={{ headerShown: false }} />
       <Stack.Screen name="Details" component={DetailScreen} options={{ title: 'Detalles' }} />
       <Stack.Screen name="Community" component={CommunityScreen} options={{ headerShown: false }} /> 
-      <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ title: 'Post' }} />
+      <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ headerShown: false }} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Editar Perfil' }} />
-      <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Mi Perfil' }} />
-      <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ title: 'Perfil de Usuario' }} />
+      <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="UserProfile" component={UserProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Subscriptions" component={SubscriptionsScreen} options={{ title: 'Mis Suscripciones' }} />
       <Stack.Screen name="CreatePost" component={CreatePostScreen} options={{ title: 'Nuevo Post' }} />
       <Stack.Screen name="CreateCommunity" component={CreateCommunityScreen} options={{ title: 'Crear Comunidad' }}/>

@@ -7,7 +7,7 @@ const verifyToken = require('../middleware/authMiddleware');
 // ✅ Agregar un comentario
 router.post('/:postId', verifyToken, async (req, res) => {
   try {
-    const { content } = req.body;
+    const { content, parentComment } = req.body;
     const postId = req.params.postId;
     const userId = req.userId;
 
@@ -26,41 +26,52 @@ router.post('/:postId', verifyToken, async (req, res) => {
       });
     }
 
+    // Si es una respuesta, verificar que el comentario padre existe
+    if (parentComment) {
+      const parentCommentExists = await Comment.findById(parentComment);
+      if (!parentCommentExists) {
+        return res.status(404).json({
+          error: 'Comentario padre no encontrado',
+          details: { parentComment: 'El comentario al que intentas responder no existe' }
+        });
+      }
+    }
+
     const newComment = new Comment({
       content,
-      author: userId,
-      post: postId
+      user: userId,
+      post: postId,
+      parentComment: parentComment || null
     });
 
+    // Guardar el comentario
     await newComment.save();
-    post.comments.push(newComment._id);
-    await post.save();
+
+    // Si es una respuesta, actualizar el comentario padre
+    if (parentComment) {
+      await Comment.findByIdAndUpdate(
+        parentComment,
+        { $push: { replies: newComment._id } }
+      );
+    }
+
+    // Actualizar el post con el nuevo comentario
+    await Post.findByIdAndUpdate(
+      postId,
+      { $push: { comments: newComment._id } }
+    );
+
+    // Populate el autor del comentario antes de enviar la respuesta
+    const populatedComment = await Comment.findById(newComment._id)
+      .populate('user', 'name username profilePicture')
+      .lean();
 
     res.status(201).json({ 
       message: 'Comentario agregado con éxito',
-      comment: {
-        _id: newComment._id,
-        content: newComment.content,
-        author: newComment.author,
-        post: newComment.post,
-        likes: newComment.likes,
-        createdAt: newComment.createdAt
-      }
+      comment: populatedComment
     });
   } catch (error) {
     console.error('❌ Error al agregar comentario:', error);
-    
-    if (error.name === 'ValidationError') {
-      const details = {};
-      Object.keys(error.errors).forEach(key => {
-        details[key] = error.errors[key].message;
-      });
-      return res.status(400).json({ 
-        error: 'Error de validación',
-        details
-      });
-    }
-
     res.status(500).json({ 
       error: 'Error al agregar comentario',
       message: error.message 
@@ -71,27 +82,32 @@ router.post('/:postId', verifyToken, async (req, res) => {
 // 🧠 Obtener comentarios de una publicación
 router.get('/post/:postId', async (req, res) => {
   try {
-    const comments = await Comment.find({ post: req.params.postId })
-      .populate('author', 'name username profilePicture')
-      .sort({ createdAt: -1 });
+    // Obtener todos los comentarios del post
+    const allComments = await Comment.find({ post: req.params.postId })
+      .populate('user', 'name username profilePicture')
+      .sort({ createdAt: -1 })
+      .lean();
 
-    res.json({
-      message: 'Comentarios obtenidos con éxito',
-      comments: comments.map(comment => ({
-        _id: comment._id,
-        content: comment.content,
-        author: comment.author,
-        post: comment.post,
-        likes: comment.likes,
-        createdAt: comment.createdAt
-      }))
+    // Separar comentarios principales y respuestas
+    const mainComments = allComments.filter(comment => !comment.parentComment);
+    const replies = allComments.filter(comment => comment.parentComment);
+
+    // Asignar respuestas a sus comentarios principales
+    const commentsWithReplies = mainComments.map(comment => {
+      const commentReplies = replies
+        .filter(reply => reply.parentComment.toString() === comment._id.toString())
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+      return {
+        ...comment,
+        replies: commentReplies
+      };
     });
+
+    res.json(commentsWithReplies);
   } catch (error) {
-    console.error('❌ Error al obtener comentarios:', error);
-    res.status(500).json({ 
-      error: 'Error al obtener comentarios',
-      message: error.message 
-    });
+    console.error('Error al obtener comentarios:', error);
+    res.status(500).json({ error: 'Error al obtener comentarios' });
   }
 });
 
@@ -180,7 +196,7 @@ router.delete('/:commentId', verifyToken, async (req, res) => {
       });
     }
 
-    if (!comment.author.equals(req.userId)) {
+    if (!comment.user.equals(req.userId)) {
       return res.status(403).json({ 
         error: 'No autorizado',
         details: { userId: 'No tienes permiso para eliminar este comentario' }
@@ -199,6 +215,64 @@ router.delete('/:commentId', verifyToken, async (req, res) => {
     console.error('❌ Error al eliminar comentario:', error);
     res.status(500).json({ 
       error: 'Error al eliminar comentario',
+      message: error.message 
+    });
+  }
+});
+
+// ✅ Responder a un comentario
+router.post('/post/:postId/reply/:commentId', verifyToken, async (req, res) => {
+  try {
+    const { content } = req.body;
+    const postId = req.params.postId;
+    const parentCommentId = req.params.commentId;
+    const userId = req.userId;
+
+    if (!content) {
+      return res.status(400).json({ 
+        error: 'Datos incompletos',
+        details: { content: 'El contenido del comentario es obligatorio' }
+      });
+    }
+
+    const parentComment = await Comment.findById(parentCommentId);
+    if (!parentComment) {
+      return res.status(404).json({ 
+        error: 'Comentario no encontrado',
+        details: { commentId: 'El comentario no existe' }
+      });
+    }
+
+    const newReply = new Comment({
+      content,
+      user: userId,
+      post: postId,
+      parentComment: parentCommentId
+    });
+
+    // Usar Promise.all para ejecutar operaciones en paralelo
+    const [savedReply, updatedParent] = await Promise.all([
+      newReply.save(),
+      Comment.findByIdAndUpdate(
+        parentCommentId,
+        { $push: { replies: newReply._id } },
+        { new: true }
+      )
+    ]);
+
+    // Populate el autor de la respuesta antes de enviar la respuesta
+    const populatedReply = await Comment.findById(savedReply._id)
+      .populate('user', 'name username profilePicture')
+      .lean();
+
+    res.status(201).json({ 
+      message: 'Respuesta agregada con éxito',
+      reply: populatedReply
+    });
+  } catch (error) {
+    console.error('❌ Error al agregar respuesta:', error);
+    res.status(500).json({ 
+      error: 'Error al agregar respuesta',
       message: error.message 
     });
   }

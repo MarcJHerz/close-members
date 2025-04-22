@@ -1,0 +1,27 @@
+[33mcommit 1461557ad500b320813bd2455b72fcb22e563eee[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m
+Author: marcherz <marchernandezgar@gmail.com>
+Date:   Mon Apr 14 08:06:35 2025 -0700
+
+    feat: implementación de tipografía Inter y actualización de tema
+
+ audio-social-app/App.tsx                           |  16 [32m+[m[31m-[m
+ audio-social-app/app.json                          |   3 [32m+[m[31m-[m
+ audio-social-app/assets/fonts/Inter-Bold.ttf       | Bin [31m0[m -> [32m344152[m bytes
+ audio-social-app/assets/fonts/Inter-Light.ttf      | Bin [31m0[m -> [32m343704[m bytes
+ audio-social-app/assets/fonts/Inter-Medium.ttf     | Bin [31m0[m -> [32m343200[m bytes
+ audio-social-app/assets/fonts/Inter-Regular.ttf    | Bin [31m0[m -> [32m342680[m bytes
+ audio-social-app/assets/fonts/Inter-SemiBold.ttf   | Bin [31m0[m -> [32m343828[m bytes
+ audio-social-app/package-lock.json                 |   1 [32m+[m
+ audio-social-app/package.json                      |   3 [32m+[m[31m-[m
+ audio-social-app/react-native.config.js            |   7 [32m+[m
+ audio-social-app/src/screens/ProfileScreen.tsx     | 221 [32m++++++++[m[31m--------[m
+ audio-social-app/src/screens/UserProfileScreen.tsx | 288 [32m++++++++++++++++++[m[31m---[m
+ audio-social-app/src/theme.ts                      |  81 [32m++++[m[31m--[m
+ audio-social-backend/routes/allyRoutes.js          |  68 [32m++++[m[31m-[m
+ audio-social-backend/routes/communitiesRoutes.js   |  84 [32m++++[m[31m--[m
+ audio-social-backend/routes/postsRoutes.js         |  20 [32m+[m[31m-[m
+ audio-social-backend/routes/subscriptionsRoutes.js |  23 [32m++[m
+ ...948228-EF5D1D92-96D1-459D-B975-A27716EA77B5.jpg | Bin [31m0[m -> [32m6104497[m bytes
+ ...876967-797C511A-6336-4A93-8B42-150AB096B467.jpg | Bin [31m0[m -> [32m5913081[m bytes
+ ...026543-67985F64-A164-4B5A-A90F-A7AAC137059B.jpg | Bin [31m0[m -> [32m3997219[m bytes
+ 20 files changed, 621 insertions(+), 194 deletions(-)
