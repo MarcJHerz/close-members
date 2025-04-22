@@ -1,579 +1,529 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, Image, TouchableOpacity, StyleSheet,
-  ActivityIndicator, FlatList, Dimensions, ScrollView
+  View, Text, Image, StyleSheet, ScrollView,
+  TouchableOpacity, ActivityIndicator, Alert, FlatList, Linking
 } from 'react-native';
-import axios from 'axios';
-import { useNavigation, useRoute, RouteProp, NavigationProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { RootStackParamList } from '../../MainNavigator';
 import { theme } from '../theme';
-import BlockRenderer from '../components/ProfileBlocks/BlockRenderer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import { NavigationProp, RouteProp } from '@react-navigation/native';
+import { RootStackParamList } from '../../MainNavigator';
 
 const API_URL = 'http://192.168.1.87:5000';
 
-const formatImageUrl = (url: string | undefined) => {
-  if (!url) return 'https://via.placeholder.com/100';
-  if (url.startsWith('http')) return url;
-  return `${API_URL}/${url}`;
-};
-
-type UserProfileRouteProp = RouteProp<RootStackParamList, 'UserProfile'>;
-
-interface Post {
+interface User {
   _id: string;
-  text: string;
-  media?: { url: string; type: string }[];
-  community: { _id: string; name: string };
+  name: string;
+  username: string;
+  email: string;
+  profilePicture: string;
+  bannerImage: string;
+  bio: string;
+  category: string;
+  links: string[];
+  profileBlocks: Array<{
+    type: string;
+    content: any;
+    position: number;
+    styles: any;
+  }>;
+  subscriptionPrice: number;
 }
 
-interface Community {
+interface BaseItem {
   _id: string;
+}
+
+interface Post extends BaseItem {
+  text: string;
+  media?: { url: string; type: string }[];
+  likes: string[];
+  createdAt?: string;
+  community?: string;
+}
+
+interface Community extends BaseItem {
   name: string;
   description?: string;
   coverImage?: string;
   members?: string[];
 }
 
-interface Subscription {
-  _id: string;
-  community: Community;
-}
+type ContentType = Post | Community;
 
-interface Ally {
-  _id: string;
-  name: string;
-  username: string;
-  profilePicture?: string;
-}
+type Tab = 'posts' | 'joined' | 'created';
 
-export default function UserProfileScreen() {
-  const route = useRoute<UserProfileRouteProp>();
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const { userId } = route.params;
+type UserProfileScreenProps = {
+  route: RouteProp<RootStackParamList, 'UserProfile'>;
+  navigation: NavigationProp<RootStackParamList>;
+};
 
-  const [user, setUser] = useState<any>(null);
+const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ route, navigation }) => {
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const [activeTab, setActiveTab] = useState<'posts' | 'communities' | 'subscriptions' | 'about' | 'allies' | 'joined'>('about');
+  const [activeTab, setActiveTab] = useState<Tab>('posts');
   const [posts, setPosts] = useState<Post[]>([]);
-  const [communities, setCommunities] = useState<Community[]>([]);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [allies, setAllies] = useState<Ally[]>([]);
   const [joinedCommunities, setJoinedCommunities] = useState<Community[]>([]);
+  const [createdCommunities, setCreatedCommunities] = useState<Community[]>([]);
 
   useEffect(() => {
-    loadProfile();
-  }, [userId]);
+    loadUserProfile();
+  }, [route.params?.userId]);
 
-  const loadProfile = async () => {
+  const loadUserProfile = async () => {
     try {
-      setLoading(true);
       const token = await AsyncStorage.getItem('token');
-      
+      const userId = route.params?.userId;
+
+      if (!userId) {
+        throw new Error('No se proporcionó ID de usuario');
+      }
+
+      const response = await axios.get(`${API_URL}/api/users/profile/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setUser(response.data);
+      setLoading(false);
+
       // Cargar datos en paralelo
       await Promise.all([
-        fetchUserProfile(),
-        fetchUserPosts(),
-        fetchUserCommunities(),
-        fetchAllies(),
-        fetchJoinedCommunities()
+        fetchUserPosts(userId),
+        fetchCreatedCommunities(userId),
+        fetchJoinedCommunities(userId)
       ]);
-      
-    } catch (err) {
-      console.error('❌ Error al cargar el perfil:', err);
-    } finally {
+
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      Alert.alert('Error', 'No se pudo cargar el perfil');
       setLoading(false);
     }
   };
 
-  const fetchUserProfile = async () => {
+  const fetchUserPosts = async (userId: string) => {
     try {
-      const res = await axios.get(`http://192.168.1.87:5000/api/users/profile/${userId}`);
-      setUser({
-        ...res.data,
-        profilePicture: res.data.profilePicture?.startsWith('http') ? res.data.profilePicture : `http://192.168.1.87:5000/${res.data.profilePicture}`,
-        bannerImage: res.data.bannerImage?.startsWith('http') ? res.data.bannerImage : `http://192.168.1.87:5000/${res.data.bannerImage}`,
-      });
+      const res = await axios.get(`${API_URL}/api/posts/user/${userId}`);
+      console.log(`✅ ${res.data.length} publicaciones cargadas`);
+      setPosts(res.data);
     } catch (error) {
-      console.error('Error al cargar el perfil:', error);
+      console.error('❌ Error al obtener publicaciones:', error);
     }
   };
 
-  const fetchUserPosts = async () => {
+  const fetchCreatedCommunities = async (userId: string) => {
     try {
-      const postRes = await axios.get(`http://192.168.1.87:5000/api/posts/user/${userId}`);
-      setPosts(postRes.data);
+      const res = await axios.get(`${API_URL}/api/communities/created-by/${userId}`);
+      console.log(`✅ ${res.data.length} comunidades creadas cargadas`);
+      setCreatedCommunities(res.data);
     } catch (error) {
-      console.error('Error al cargar publicaciones:', error);
-      setPosts([]);
+      console.error('❌ Error al obtener comunidades creadas:', error);
     }
   };
 
-  const fetchUserCommunities = async () => {
-    try {
-      const communityRes = await axios.get(`http://192.168.1.87:5000/api/communities/created-by/${userId}`);
-      setCommunities(communityRes.data);
-    } catch (error) {
-      console.error('Error al cargar comunidades creadas:', error);
-      setCommunities([]);
-    }
-  };
-
-  
-
-  const fetchAllies = async () => {
+  const fetchJoinedCommunities = async (userId: string) => {
     try {
       const token = await AsyncStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/api/allies/my-allies`, {
+      const response = await axios.get(`${API_URL}/api/subscriptions/by-user`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setAllies(response.data);
+      setJoinedCommunities(response.data);
     } catch (error) {
-      console.error('Error al cargar aliados:', error);
-      setAllies([]);
-    }
-  };
-
-  const fetchJoinedCommunities = async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      const response = await fetch(`${API_URL}/api/communities/joined-by/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (!response.ok) {
-        throw new Error('Error al obtener comunidades unidas');
-      }
-      const data = await response.json();
-      setJoinedCommunities(data);
-    } catch (error) {
-      console.error('Error al obtener comunidades unidas:', error);
+      console.error('Error al obtener comunidades suscritas:', error);
       setJoinedCommunities([]);
     }
   };
 
+  const formatImageUrl = (url?: string, defaultUrl = 'https://via.placeholder.com/300') => {
+    if (!url) return defaultUrl;
+    if (url.startsWith('http')) return url;
+    return `${API_URL}/${url.replace(/^\//, '')}`;
+  };
+
+  const handleLinkPress = (url: string) => {
+    if (!url.startsWith('http')) {
+      url = 'https://' + url;
+    }
+    Linking.openURL(url);
+  };
+
   const renderPost = ({ item }: { item: Post }) => (
-    <TouchableOpacity onPress={() => navigation.navigate('PostDetail', { postId: item._id })} style={styles.card}>
-      {item.media?.[0] && (
-        <Image
-          source={{ uri: `http://192.168.1.87:5000/${item.media[0].url}` }}
-          style={styles.coverImage}
+    <TouchableOpacity 
+      style={styles.postCard}
+      onPress={() => navigation.navigate('PostDetail', { postId: item._id })}
+    >
+      {item.media && item.media.length > 0 && (
+        <Image 
+          source={{ uri: formatImageUrl(item.media[0].url) }} 
+          style={styles.postImage}
         />
       )}
-      <Text style={styles.title}>{item.text}</Text>
-      <Text style={styles.description}>📍 {item.community?.name}</Text>
+      <View style={styles.postContent}>
+        <Text style={styles.postText} numberOfLines={2}>{item.text}</Text>
+        <View style={styles.postFooter}>
+          <Text style={styles.likeCount}>{item.likes?.length || 0} likes</Text>
+        </View>
+      </View>
     </TouchableOpacity>
   );
-  
+
   const renderCommunity = ({ item }: { item: Community }) => (
-    <TouchableOpacity onPress={() => navigation.navigate('Community', { communityId: item._id })} style={styles.card}>
-      <Image source={{ uri: item.coverImage || 'https://via.placeholder.com/300' }} style={styles.coverImage} />
-      <Text style={styles.title}>{item.name}</Text>
-      <Text style={styles.description}>{item.description}</Text>
+    <TouchableOpacity 
+      style={styles.communityCard}
+      onPress={() => navigation.navigate('Community', { communityId: item._id })}
+    >
+      <Image 
+        source={{ uri: formatImageUrl(item.coverImage) }} 
+        style={styles.communityImage}
+      />
+      <View style={styles.communityContent}>
+        <Text style={styles.communityName}>{item.name}</Text>
+        <Text style={styles.communityDescription} numberOfLines={2}>
+          {item.description || 'Sin descripción'}
+        </Text>
+        <View style={styles.memberCount}>
+          <Ionicons name="people-outline" size={14} color="#666" />
+          <Text style={styles.memberCountText}>{item.members?.length || 0} miembros</Text>
+        </View>
+      </View>
     </TouchableOpacity>
   );
-  
-  const renderSubscription = ({ item }: { item: Subscription }) => (
-    <TouchableOpacity onPress={() => navigation.navigate('Community', { communityId: item.community._id })} style={styles.card}>
-      <Image source={{ uri: item.community.coverImage || 'https://via.placeholder.com/300' }} style={styles.coverImage} />
-      <Text style={styles.title}>{item.community.name}</Text>
-      <Text style={styles.description}>{item.community.description}</Text>
-    </TouchableOpacity>
-  );
-  
-  if (loading || !user) {
+
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>Cargando perfil...</Text>
       </View>
     );
   }
 
-  return (
-    <View style={styles.container}>
-      {/* 🔹 Banner */}
-      <Image source={{ uri: user.bannerImage }} style={styles.banner} />
+  if (!user) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>No se pudo cargar el perfil</Text>
+      </View>
+    );
+  }
 
-      <View style={styles.profileInfo}>
-        <Image source={{ uri: user.profilePicture }} style={styles.profilePicture} />
-        <View style={styles.userInfo}>
-          <Text style={styles.name}>{user.name}</Text>
-          <Text style={styles.username}>@{user.username || 'sin_usuario'}</Text>
-        </View>
+  const getCurrentData = (): ContentType[] => {
+    switch (activeTab) {
+      case 'posts':
+        return posts;
+      case 'joined':
+        return joinedCommunities;
+      case 'created':
+        return createdCommunities;
+      default:
+        return [];
+    }
+  };
+
+  const getEmptyMessage = () => {
+    switch (activeTab) {
+      case 'posts':
+        return 'No hay posts para mostrar';
+      case 'joined':
+        return 'No se ha unido a ninguna comunidad';
+      case 'created':
+        return 'No ha creado ninguna comunidad';
+      default:
+        return 'No hay contenido para mostrar';
+    }
+  };
+
+  return (
+    <ScrollView 
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+    >
+      <View style={styles.bannerContainer}>
+        <Image
+          source={{ uri: formatImageUrl(user.bannerImage) }}
+          style={styles.banner}
+        />
       </View>
 
-      <Text style={styles.bio}>{user.bio || 'Sin biografía disponible'}</Text>
+      <View style={styles.profileContainer}>
+        <Image 
+          source={{ uri: formatImageUrl(user.profilePicture) }}
+          style={styles.profileImage}
+        />
+        
+        <View style={styles.userInfo}>
+          <Text style={styles.name}>{user.name}</Text>
+          <Text style={styles.username}>@{user.username}</Text>
+          {user.category && (
+            <Text style={styles.category}>{user.category}</Text>
+          )}
+        </View>
 
-      {/* 🔹 Tabs */}
-      <View style={styles.tabs}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'about' && styles.activeTab]}
-          onPress={() => setActiveTab('about')}
-        >
-          <Ionicons
-            name="person-outline"
-            size={26}
-            color={activeTab === 'about' ? theme.colors.primary : '#999'}
-          />
-        </TouchableOpacity>
+        {user.bio && (
+          <Text style={styles.bio}>{user.bio}</Text>
+        )}
+
+        {user.links && user.links.length > 0 && (
+          <View style={styles.linksContainer}>
+            {user.links.map((link, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.linkButton}
+                onPress={() => handleLinkPress(link)}
+              >
+                <Ionicons name="link-outline" size={16} color={theme.colors.primary} />
+                <Text style={styles.linkText}>{link}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+
+      <View style={styles.tabsContainer}>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
           onPress={() => setActiveTab('posts')}
         >
-          <Ionicons
-            name="grid-outline"
-            size={26}
-            color={activeTab === 'posts' ? theme.colors.primary : '#999'}
+          <Ionicons 
+            name="document-text-outline" 
+            size={24} 
+            color={activeTab === 'posts' ? theme.colors.primary : '#666'} 
           />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'communities' && styles.activeTab]}
-          onPress={() => setActiveTab('communities')}
-        >
-          <Ionicons
-            name="people-outline"
-            size={26}
-            color={activeTab === 'communities' ? theme.colors.primary : '#999'}
-          />
+          <Text style={[styles.tabText, activeTab === 'posts' && styles.activeTabText]}>
+            Posts
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'joined' && styles.activeTab]}
           onPress={() => setActiveTab('joined')}
         >
-          <Ionicons
-            name="star-outline"
-            size={26}
-            color={activeTab === 'joined' ? theme.colors.primary : '#999'}
+          <Ionicons 
+            name="people-outline" 
+            size={24} 
+            color={activeTab === 'joined' ? theme.colors.primary : '#666'} 
           />
+          <Text style={[styles.tabText, activeTab === 'joined' && styles.activeTabText]}>
+            Unido
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.tab, activeTab === 'allies' && styles.activeTab]}
-          onPress={() => setActiveTab('allies')}
+          style={[styles.tab, activeTab === 'created' && styles.activeTab]}
+          onPress={() => setActiveTab('created')}
         >
-          <Ionicons
-            name="person-add-outline"
-            size={26}
-            color={activeTab === 'allies' ? theme.colors.primary : '#999'}
+          <Ionicons 
+            name="add-circle-outline" 
+            size={24} 
+            color={activeTab === 'created' ? theme.colors.primary : '#666'} 
           />
+          <Text style={[styles.tabText, activeTab === 'created' && styles.activeTabText]}>
+            Creado
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* About Tab - Custom Profile */}
-      {activeTab === 'about' && (
-        <ScrollView style={styles.aboutContent}>
-          {user.profileBlocks && user.profileBlocks.length > 0 ? (
-            <View style={styles.blocksContainer}>
-              <BlockRenderer blocks={user.profileBlocks} />
-            </View>
-          ) : (
-            <View style={styles.emptyState}>
-              <Ionicons name="person-circle-outline" size={60} color="#ccc" />
-              <Text style={styles.emptyText}>Este usuario no ha personalizado su perfil.</Text>
-            </View>
-          )}
-        </ScrollView>
-      )}
-
-      {/* Post, Communities, Subscriptions Tabs */}
-      {activeTab === 'posts' && (
-        <FlatList
-          data={posts}
-          keyExtractor={(item) => item._id}
-          renderItem={renderPost}
-          contentContainerStyle={{ padding: 15 }}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="document-outline" size={60} color="#ccc" />
-              <Text style={styles.emptyText}>Este usuario no tiene publicaciones.</Text>
-            </View>
+      <FlatList<BaseItem>
+        data={getCurrentData()}
+        renderItem={({ item }) => {
+          if (activeTab === 'posts') {
+            return renderPost({ item: item as Post });
           }
-        />
-      )}
-      
-      {activeTab === 'communities' && (
-        <FlatList
-          data={communities}
-          keyExtractor={(item) => item._id}
-          renderItem={renderCommunity}
-          contentContainerStyle={{ padding: 15 }}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={60} color="#ccc" />
-              <Text style={styles.emptyText}>Este usuario no ha creado comunidades.</Text>
-            </View>
-          }
-        />
-      )}
-      
-      
-
-      {activeTab === 'joined' && (
-        <View style={styles.contentContainer}>
-          {joinedCommunities.length > 0 ? (
-            <FlatList
-              data={joinedCommunities}
-              keyExtractor={(item) => item._id}
-              renderItem={({ item }) => (
-                <TouchableOpacity 
-                  style={styles.communityCard}
-                  onPress={() => navigation.navigate('Community', { communityId: item._id })}
-                >
-                  <Image 
-                    source={{ uri: formatImageUrl(item.coverImage) }} 
-                    style={styles.communityImage} 
-                  />
-                  <View style={styles.communityInfo}>
-                    <Text style={styles.communityName}>{item.name}</Text>
-                    <Text style={styles.communityDesc} numberOfLines={2}>
-                      {item.description || 'Sin descripción'}
-                    </Text>
-                    <View style={styles.memberCount}>
-                      <Ionicons name="people-outline" size={14} color="#666" />
-                      <Text style={styles.memberText}>
-                        {item.members?.length || 0} miembros
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              )}
-            />
-          ) : (
-            <View style={styles.emptyStateContainer}>
-              <Ionicons name="people-outline" size={60} color="#ccc" />
-              <Text style={styles.emptyStateText}>
-                Este usuario no se ha unido a ninguna comunidad todavía.
-              </Text>
-            </View>
-          )}
-        </View>
-      )}
-
-      {activeTab === 'allies' && (
-        <View style={styles.contentContainer}>
-          {allies.length > 0 ? (
-            <FlatList
-              data={allies}
-              keyExtractor={(item) => item._id}
-              numColumns={2}
-              renderItem={({ item }) => (
-                <TouchableOpacity 
-                  style={styles.allyCard}
-                  onPress={() => navigation.navigate('UserProfile', { userId: item._id })}
-                >
-                  <Image 
-                    source={{ uri: formatImageUrl(item.profilePicture) }} 
-                    style={styles.allyAvatar} 
-                  />
-                  <Text style={styles.allyName} numberOfLines={1}>{item.name}</Text>
-                  <Text style={styles.allyUsername} numberOfLines={1}>@{item.username}</Text>
-                </TouchableOpacity>
-              )}
-            />
-          ) : (
-            <View style={styles.emptyStateContainer}>
-              <Ionicons name="people-outline" size={60} color="#ccc" />
-              <Text style={styles.emptyStateText}>
-                Este usuario no tiene aliados todavía.
-              </Text>
-            </View>
-          )}
-        </View>
-      )}
-    </View>
+          return renderCommunity({ item: item as Community });
+        }}
+        keyExtractor={item => item._id}
+        contentContainerStyle={styles.contentList}
+        scrollEnabled={false}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>{getEmptyMessage()}</Text>
+        }
+      />
+    </ScrollView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: theme.colors.background 
+    backgroundColor: '#fff',
+  },
+  contentContainer: {
+    flexGrow: 1,
   },
   loadingContainer: { 
     flex: 1, 
     justifyContent: 'center', 
-    alignItems: 'center' 
+    alignItems: 'center',
   },
-  loadingText: { 
-    fontSize: 16, 
-    marginTop: 10,
-    color: theme.colors.text 
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  banner: { 
-    width: '100%', 
-    height: 120, 
-    resizeMode: 'cover' 
+  errorText: {
+    fontSize: 16,
+    color: '#666',
   },
-  profileInfo: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    padding: 10 
+  bannerContainer: {
+    height: 200,
   },
-  profilePicture: { 
-    width: 80, 
-    height: 80, 
-    borderRadius: 40, 
-    borderWidth: 2, 
-    borderColor: theme.colors.primary 
+  banner: {
+    width: '100%',
+    height: '100%',
   },
-  userInfo: { 
-    flex: 1, 
-    marginLeft: 10 
+  profileContainer: {
+    padding: 16,
+    alignItems: 'center',
   },
-  name: { 
-    fontSize: 18, 
-    fontWeight: 'bold', 
-    color: theme.colors.text 
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 4,
+    borderColor: '#fff',
+    marginTop: -50,
   },
-  username: { 
-    fontSize: 16, 
-    color: theme.colors.lightText 
+  userInfo: {
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 16,
   },
-  bio: { 
-    fontSize: 14, 
-    color: theme.colors.lightText, 
-    paddingHorizontal: 10, 
-    marginBottom: 10 
+  name: {
+    fontSize: 24,
+    fontWeight: 'bold',
   },
-  tabs: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-around', 
-    borderBottomWidth: 1, 
-    borderColor: '#eee', 
-    paddingVertical: 8 
+  username: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 4,
   },
-  tab: {
+  category: {
+    fontSize: 16,
+    color: theme.colors.primary,
+    marginTop: 4,
+  },
+  bio: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  linksContainer: {
+    width: '100%',
+    paddingHorizontal: 16,
+  },
+  linkButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     padding: 8,
+    marginBottom: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+  },
+  linkText: {
+    marginLeft: 8,
+    color: theme.colors.primary,
+    fontSize: 14,
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    marginBottom: 16,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderColor: theme.colors.primary,
+    borderBottomColor: theme.colors.primary,
   },
-  aboutContent: {
-    flex: 1,
-    padding: 15,
+  tabText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
   },
-  blocksContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
+  activeTabText: {
+    color: theme.colors.primary,
+    fontWeight: 'bold',
   },
-  card: { 
-    backgroundColor: '#fff', 
-    borderRadius: 10, 
-    marginBottom: 10, 
-    padding: 10 
-  },
-  coverImage: { 
-    width: '100%', 
-    height: 150, 
-    borderRadius: 10 
-  },
-  title: { 
-    fontSize: 16, 
-    fontWeight: 'bold', 
-    marginTop: 5 
-  },
-  description: { 
-    fontSize: 14, 
-    color: theme.colors.text, 
-    marginTop: 3 
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 30,
-    marginTop: 20,
+  contentList: {
+    padding: 16,
   },
   emptyText: {
     textAlign: 'center',
-    color: '#888',
-    marginTop: 10,
-    fontSize: 16,
+    color: '#666',
+    marginTop: 20,
   },
-  allyCard: {
-    flex: 1,
-    margin: 8,
+  postCard: {
     backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 12,
-    alignItems: 'center',
+    borderRadius: 8,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
-  allyAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  postImage: {
+    width: '100%',
+    height: 200,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  postContent: {
+    padding: 12,
+  },
+  postText: {
+    fontSize: 16,
     marginBottom: 8,
   },
-  allyName: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-    textAlign: 'center',
-  },
-  allyUsername: {
-    fontSize: 12,
-    color: theme.colors.lightText,
-    textAlign: 'center',
-  },
-  contentContainer: {
-    flex: 1,
-    padding: 15,
-  },
-  emptyStateContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 30,
-    marginTop: 20,
-  },
-  emptyStateText: {
-    textAlign: 'center',
-    color: '#888',
-    marginTop: 10,
-    fontSize: 16,
-  },
-  communityCard: {
+  postFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    borderBottomWidth: 1,
-    borderColor: '#eee',
+  },
+  likeCount: {
+    fontSize: 14,
+    color: '#666',
+  },
+  communityCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginBottom: 16,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   communityImage: {
     width: 80,
     height: 80,
-    borderRadius: 10,
-    marginRight: 10,
   },
-  communityInfo: {
+  communityContent: {
     flex: 1,
+    padding: 12,
   },
   communityName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: theme.colors.text,
+    marginBottom: 4,
   },
-  communityDesc: {
+  communityDescription: {
     fontSize: 14,
-    color: theme.colors.text,
+    color: '#666',
+    marginBottom: 4,
   },
   memberCount: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 5,
   },
-  memberText: {
-    fontSize: 14,
+  memberCountText: {
+    fontSize: 12,
     color: '#666',
+    marginLeft: 4,
   },
 });
+
+export default UserProfileScreen;

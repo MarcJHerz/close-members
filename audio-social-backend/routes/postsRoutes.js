@@ -83,14 +83,42 @@ router.get('/community/:communityId', async (req, res) => {
 });
 
 // 📌 Obtener un post específico por ID
-router.get('/:postId', async (req, res) => {
+router.get('/:postId', verifyToken, async (req, res) => {
   try {
+    console.log('🔍 Buscando post con ID:', req.params.postId);
+    
     const post = await Post.findById(req.params.postId)
-      .populate('user', 'name profilePicture')
-      .populate('comments');
+      .populate('user', 'name username profilePicture')
+      .populate({
+        path: 'comments',
+        populate: {
+          path: 'user',
+          select: 'name username profilePicture'
+        }
+      });
 
     if (!post) {
+      console.log('❌ Post no encontrado');
       return res.status(404).json({ error: 'Post no encontrado' });
+    }
+
+    // Procesar la imagen de perfil del usuario
+    if (post.user && post.user.profilePicture) {
+      post.user.profilePicture = post.user.profilePicture.startsWith('http') 
+        ? post.user.profilePicture 
+        : `${process.env.BASE_URL}/${post.user.profilePicture}`;
+    }
+
+    // Procesar imágenes de perfil en los comentarios
+    if (post.comments && post.comments.length > 0) {
+      post.comments = post.comments.map(comment => {
+        if (comment.user && comment.user.profilePicture) {
+          comment.user.profilePicture = comment.user.profilePicture.startsWith('http')
+            ? comment.user.profilePicture
+            : `${process.env.BASE_URL}/${comment.user.profilePicture}`;
+        }
+        return comment;
+      });
     }
 
     res.json(post);
@@ -115,21 +143,72 @@ router.post('/:postId/like', verifyToken, async (req, res) => {
   try {
     const post = await Post.findById(req.params.postId);
     if (!post) {
-      return res.status(404).json({ error: 'Post no encontrado' });
+      return res.status(404).json({ 
+        error: 'Post no encontrado',
+        details: { postId: 'El post no existe' }
+      });
     }
 
-    const userId = req.userId;
-    if (post.likes.includes(userId)) {
-      post.likes = post.likes.filter((id) => id.toString() !== userId);
-    } else {
-      post.likes.push(userId);
+    // Verificar si el usuario ya dio like
+    if (post.likes.includes(req.userId)) {
+      return res.status(400).json({ 
+        error: 'Like ya existe',
+        details: { userId: 'Ya has dado like a este post' }
+      });
     }
 
+    // Agregar el like
+    post.likes.push(req.userId);
     await post.save();
-    res.json({ message: 'Like actualizado', likes: post.likes.length });
+
+    res.json({ 
+      message: 'Like agregado con éxito',
+      likes: post.likes.length,
+      isLiked: true
+    });
   } catch (error) {
     console.error('❌ Error al dar like:', error);
-    res.status(500).json({ error: 'Error al dar like al post' });
+    res.status(500).json({ 
+      error: 'Error al dar like',
+      message: error.message 
+    });
+  }
+});
+
+// ✅ Quitar like de un post
+router.post('/:postId/unlike', verifyToken, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.postId);
+    if (!post) {
+      return res.status(404).json({ 
+        error: 'Post no encontrado',
+        details: { postId: 'El post no existe' }
+      });
+    }
+
+    // Verificar si el usuario no ha dado like
+    if (!post.likes.includes(req.userId)) {
+      return res.status(400).json({ 
+        error: 'Like no existe',
+        details: { userId: 'No has dado like a este post' }
+      });
+    }
+
+    // Quitar el like
+    post.likes = post.likes.filter(id => !id.equals(req.userId));
+    await post.save();
+
+    res.json({ 
+      message: 'Like eliminado con éxito',
+      likes: post.likes.length,
+      isLiked: false
+    });
+  } catch (error) {
+    console.error('❌ Error al quitar like:', error);
+    res.status(500).json({ 
+      error: 'Error al quitar like',
+      message: error.message 
+    });
   }
 });
 
@@ -219,7 +298,5 @@ router.get('/feed/alliances', verifyToken, async (req, res) => {
     res.status(500).json({ error: 'Error al obtener feed' });
   }
 });
-
-
 
 module.exports = router;

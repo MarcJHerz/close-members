@@ -122,7 +122,7 @@ router.get('/profile', async (req, res) => {
 });
 
 // ✅ Ruta para obtener el perfil de cualquier usuario
-router.get('/profile/:userId', async (req, res) => {
+router.get('/profile/:userId', verifyToken, async (req, res) => {
   try {
     const { userId } = req.params;
     if (!userId) {
@@ -144,11 +144,14 @@ router.get('/profile/:userId', async (req, res) => {
       bio: user.bio || '',
       category: user.category || '',
       links: user.links || [],
-      profileBlocks: user.profileBlocks || [], // Make sure to include profileBlocks
-      subscriptionPrice: user.subscriptionPrice ?? 0,
+      profileBlocks: user.profileBlocks || [],
+      subscriptionPrice: user.subscriptionPrice ?? 0
     });
   } catch (error) {
     console.error('❌ Error al obtener perfil de usuario:', error);
+    if (error.name === 'CastError') {
+      return res.status(400).json({ error: 'ID de usuario inválido' });
+    }
     res.status(500).json({ error: 'Error al obtener perfil de usuario' });
   }
 });
