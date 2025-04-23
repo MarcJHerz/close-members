@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image, FlatList,
-  TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl, Alert
+  TouchableOpacity, ActivityIndicator, ScrollView, RefreshControl, Alert,
+  Dimensions
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -9,6 +10,8 @@ import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { theme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../MainNavigator';
+import { BottomSheetModal } from '@gorhom/bottom-sheet';
+import ProfileOptionsSheet from '../components/ProfileOptionsSheet';
 
 interface Post {
   _id: string;
@@ -39,6 +42,10 @@ type ContentItem = Post | Community | Ally;
 
 const API_URL = 'http://192.168.1.87:5000';
 
+const HEADER_HEIGHT = 180;
+const PROFILE_IMAGE_SIZE = 90;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 interface ProfileScreenProps {
   navigation: NavigationProp<any>;
 }
@@ -54,8 +61,21 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [generalPosts, setGeneralPosts] = useState<Post[]>([]);
 
+  // Ref for the bottom sheet
+  const bottomSheetModalRef = useRef<BottomSheetModal>(null);
+
+  // Callbacks for the bottom sheet
+  const handlePresentModalPress = useCallback(() => {
+    console.log('Navegando a ProfileOptions...');
+    navigation.navigate('ProfileOptions');
+  }, [navigation]);
+
   useEffect(() => {
+    console.log('ProfileScreen montado');
     loadUserProfile();
+    return () => {
+      console.log('ProfileScreen desmontado');
+    };
   }, []);
 
   const loadUserProfile = async () => {
@@ -231,6 +251,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     }
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadUserProfile();
+    setRefreshing(false);
+  }, []);
+
   if (loading && !user) {
     return (
       <View style={styles.loadingContainer}>
@@ -241,100 +267,134 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.bannerContainer}>
-        <Image
-          source={{ uri: formatImageUrl(user?.bannerImage) }}
-          style={styles.banner}
-        />
-        <TouchableOpacity 
-          style={styles.settingsButton}
-          onPress={() => navigation.navigate('EditProfile')}
-        >
-          <Ionicons name="settings-outline" size={24} color={theme.colors.primary} />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.profileContainer}>
-        <Image 
-          source={{ uri: formatImageUrl(user?.profilePicture) }} 
-          style={styles.profileImage} 
-        />
-        <View style={styles.userInfo}>
-          <Text style={styles.name}>{user?.name}</Text>
-          <Text style={styles.username}>@{user?.username}</Text>
-          {user?.category && (
-            <Text style={styles.category}>{user?.category}</Text>
-          )}
-        </View>
-      </View>
-
-      {user?.bio && (
-        <View style={styles.bioContainer}>
-          <Text style={styles.bio}>{user.bio}</Text>
-        </View>
-      )}
-
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
-          onPress={() => setActiveTab('posts')}
-        >
-          <Ionicons 
-            name="document-text-outline" 
-            size={24} 
-            color={activeTab === 'posts' ? theme.colors.primary : '#666'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'posts' && styles.activeTabText]}>
-            Posts
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'created' && styles.activeTab]}
-          onPress={() => setActiveTab('created')}
-        >
-          <Ionicons 
-            name="add-circle-outline" 
-            size={24} 
-            color={activeTab === 'created' ? theme.colors.primary : '#666'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'created' && styles.activeTabText]}>
-            Creado
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'joined' && styles.activeTab]}
-          onPress={() => setActiveTab('joined')}
-        >
-          <Ionicons 
-            name="people-outline" 
-            size={24} 
-            color={activeTab === 'joined' ? theme.colors.primary : '#666'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'joined' && styles.activeTabText]}>
-            Unido
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <FlatList
-        data={getCurrentData()}
-        renderItem={renderItem}
-        keyExtractor={item => item._id}
-        contentContainerStyle={styles.contentList}
-        scrollEnabled={false}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>{getEmptyMessage()}</Text>
+    <View style={styles.container}>
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-      />
-    </ScrollView>
+        showsVerticalScrollIndicator={false}
+        style={styles.scrollView}
+      >
+        {/* Banner Section */}
+        <View style={styles.bannerContainer}>
+          <Image
+            source={{ uri: formatImageUrl(user?.bannerImage) }}
+            style={styles.bannerImage}
+          />
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={handlePresentModalPress}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="menu-outline" size={24} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Profile Info Section */}
+        <View style={styles.profileSection}>
+          <View style={styles.profileTopSection}>
+            <Image 
+              source={{ uri: formatImageUrl(user?.profilePicture) }}
+              style={styles.profilePicture}
+            />
+            <View style={styles.statsContainer}>
+              <TouchableOpacity style={styles.statItem}>
+                <Text style={styles.statNumber}>{posts.length}</Text>
+                <Text style={styles.statLabel}>Posts</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.statItem}>
+                <Text style={styles.statNumber}>{allies.length}</Text>
+                <Text style={styles.statLabel}>Aliados</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.statItem}>
+                <Text style={styles.statNumber}>{communitiesCreated.length}</Text>
+                <Text style={styles.statLabel}>Comunidades</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.userInfoContainer}>
+            <View style={styles.nameSection}>
+              <Text style={styles.userName}>{user?.name}</Text>
+              <Text style={styles.userHandle}>@{user?.username}</Text>
+            </View>
+            {user?.category && (
+              <View style={styles.categoryContainer}>
+                <Text style={styles.categoryText}>{user.category}</Text>
+              </View>
+            )}
+            {user?.bio && (
+              <Text style={styles.bio} numberOfLines={3}>
+                {user.bio}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Tabs Section */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
+            onPress={() => setActiveTab('posts')}
+          >
+            <Ionicons 
+              name="grid-outline" 
+              size={24} 
+              color={activeTab === 'posts' ? theme.colors.primary : '#666'} 
+            />
+            <Text style={[styles.tabText, activeTab === 'posts' && styles.activeTabText]}>
+              Posts
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'created' && styles.activeTab]}
+            onPress={() => setActiveTab('created')}
+          >
+            <Ionicons 
+              name="add-circle-outline" 
+              size={24} 
+              color={activeTab === 'created' ? theme.colors.primary : '#666'} 
+            />
+            <Text style={[styles.tabText, activeTab === 'created' && styles.activeTabText]}>
+              Creado
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'joined' && styles.activeTab]}
+            onPress={() => setActiveTab('joined')}
+          >
+            <Ionicons 
+              name="people-outline" 
+              size={24} 
+              color={activeTab === 'joined' ? theme.colors.primary : '#666'} 
+            />
+            <Text style={[styles.tabText, activeTab === 'joined' && styles.activeTabText]}>
+              Unido
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Content Section */}
+        <View style={styles.contentContainer}>
+          <FlatList
+            data={getCurrentData()}
+            renderItem={renderItem}
+            keyExtractor={item => item._id}
+            scrollEnabled={false}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>{getEmptyMessage()}</Text>
+            }
+          />
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
+  container: { 
+    flex: 1, 
+    backgroundColor: theme.colors.background,
   },
   loadingContainer: {
     flex: 1,
@@ -342,66 +402,107 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bannerContainer: {
-    height: 200,
+    height: HEADER_HEIGHT,
+    width: SCREEN_WIDTH,
     position: 'relative',
   },
-  banner: {
+  bannerImage: {
     width: '100%',
     height: '100%',
+    backgroundColor: '#ddd',
   },
-  settingsButton: {
+  menuButton: {
     position: 'absolute',
-    top: 16,
     right: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    padding: 8,
+    top: 40,
+    width: 40,
+    height: 40,
     borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  profileContainer: {
+  profileSection: {
     padding: 16,
-    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
-  profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  profileTopSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: -PROFILE_IMAGE_SIZE/2,
+  },
+  profilePicture: {
+    width: PROFILE_IMAGE_SIZE,
+    height: PROFILE_IMAGE_SIZE,
+    borderRadius: PROFILE_IMAGE_SIZE / 2,
     borderWidth: 4,
-    borderColor: '#fff',
-    marginTop: -50,
+    borderColor: theme.colors.surface,
+    marginRight: 20,
   },
-  userInfo: {
+  statsContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+  },
+  statItem: {
     alignItems: 'center',
+    paddingHorizontal: 5,
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  userInfoContainer: {
     marginTop: 16,
   },
-  name: {
-    fontSize: 24,
+  nameSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  userName: {
+    fontSize: 20,
     fontWeight: 'bold',
+    color: theme.colors.text,
+    marginRight: 8,
   },
-  username: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 4,
+  userHandle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
   },
-  category: {
-    fontSize: 16,
+  categoryContainer: {
+    backgroundColor: theme.colors.primary + '15', // 15% opacity
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  categoryText: {
     color: theme.colors.primary,
-    marginTop: 4,
-  },
-  bioContainer: {
-    padding: 16,
-    backgroundColor: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   bio: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#333',
-    textAlign: 'center',
+    fontSize: 14,
+    color: theme.colors.text,
+    lineHeight: 20,
+    marginTop: 8,
   },
   tabsContainer: {
     flexDirection: 'row',
+    backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    marginBottom: 16,
+    borderBottomColor: theme.colors.border,
   },
   tab: {
     flex: 1,
@@ -414,14 +515,14 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   activeTabText: {
     color: theme.colors.primary,
     fontWeight: 'bold',
   },
-  contentList: {
+  contentContainer: {
     padding: 12,
   },
   emptyText: {
@@ -429,6 +530,9 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginTop: 16,
+  },
+  scrollView: {
+    flex: 1,
   },
   card: {
     backgroundColor: '#fff',
