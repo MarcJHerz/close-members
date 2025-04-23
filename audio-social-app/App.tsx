@@ -1,5 +1,8 @@
+import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
+import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { AuthProvider } from './src/context/AuthContext';
 import MainNavigator from './MainNavigator';
 import * as Font from 'expo-font';
@@ -19,10 +22,18 @@ export default function App() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <MainNavigator />
-      </AuthProvider>
+    <GestureHandlerRootView style={styles.container}>
+      <BottomSheetModalProvider>
+        <AuthProvider>
+          <MainNavigator />
+        </AuthProvider>
+      </BottomSheetModalProvider>
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});

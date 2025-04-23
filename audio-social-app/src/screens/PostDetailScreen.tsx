@@ -117,7 +117,7 @@ const PostDetailScreen = () => {
       'keyboardDidShow',
       (e) => {
         setKeyboardHeight(e.endCoordinates.height);
-        flatListRef.current?.scrollToEnd({ animated: true });
+          flatListRef.current?.scrollToEnd({ animated: true });
       }
     );
     const keyboardDidHideListener = Keyboard.addListener(
@@ -211,7 +211,7 @@ const PostDetailScreen = () => {
 
   const handleComment = async () => {
     if (!commentText.trim() || !post || !userId) return;
-
+    
     try {
       setIsSubmitting(true);
       const token = await AsyncStorage.getItem('token');
@@ -288,15 +288,15 @@ const PostDetailScreen = () => {
   };
 
   if (loading || !post) {
-    return (
-      <View style={styles.loadingContainer}>
+      return (
+        <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text>Cargando post...</Text>
-      </View>
-    );
-  }
+        </View>
+      );
+    }
 
-  return (
+    return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
       style={styles.container}
@@ -308,7 +308,7 @@ const PostDetailScreen = () => {
         ListHeaderComponent={
           <View style={styles.postContainer}>
             <View style={styles.userInfo}>
-              <Image 
+          <Image
                 source={{ uri: post.user.profilePicture || 'https://via.placeholder.com/50' }} 
                 style={styles.profileImage} 
               />
@@ -317,16 +317,16 @@ const PostDetailScreen = () => {
                 <Text style={styles.postTime}>
                   {formatDate(post.createdAt)}
                 </Text>
-              </View>
+          </View>
               {post.user._id === userId && (
                 <TouchableOpacity onPress={() => setShowOptions(true)} style={styles.optionsButton}>
                   <Text style={styles.optionsText}>⋯</Text>
                 </TouchableOpacity>
               )}
-            </View>
+        </View>
 
             {post.media?.[0] && (
-              <Image 
+              <Image
                 source={{ uri: `http://192.168.1.87:5000/${post.media[0].url}` }} 
                 style={styles.postImage} 
               />
@@ -365,9 +365,9 @@ const PostDetailScreen = () => {
                 />
                 <Text style={styles.actionText}>Compartir</Text>
               </TouchableOpacity>
-            </View>
+        </View>
             <Text style={styles.sectionTitle}>Comentarios</Text>
-          </View>
+        </View>
         }
         renderItem={({ item: comment }) => (
           <View>
@@ -382,10 +382,10 @@ const PostDetailScreen = () => {
                   <Text style={styles.commentTime}>
                     {formatDate(comment.createdAt)}
                   </Text>
-                </View>
+        </View>
                 <Text style={styles.commentText}>{comment.content}</Text>
                 <View style={styles.commentActions}>
-                  <TouchableOpacity 
+        <TouchableOpacity 
                     onPress={() => {
                       setReplyingTo(comment);
                       inputRef.current?.focus();
@@ -393,16 +393,16 @@ const PostDetailScreen = () => {
                     style={styles.replyButtonContainer}
                   >
                     <Text style={styles.replyButton}>Responder</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+        </TouchableOpacity>
+      </View>
             </View>
+          </View>
 
             {comment.replies && comment.replies.length > 0 && (
               <View style={styles.repliesContainer}>
                 {comment.replies.map((reply=comment) => (
                   <View key={reply._id} style={styles.replyWrapper}>
-                    <Image
+                <Image
                       source={{ uri: reply.user?.profilePicture || defaultProfileImage }}
                       style={styles.commentProfileImage}
                     />
@@ -411,8 +411,8 @@ const PostDetailScreen = () => {
                         <Text style={styles.commentUsername}>{reply.user?.name || 'Usuario'}</Text>
                         <Text style={styles.commentTime}>
                           {formatDate(reply.createdAt)}
-                        </Text>
-                      </View>
+              </Text>
+            </View>
                       <Text style={styles.commentText}>{reply.content}</Text>
                       <View style={styles.commentActions}>
                         <TouchableOpacity 
@@ -424,41 +424,41 @@ const PostDetailScreen = () => {
                         >
                           <Text style={styles.replyButton}>Responder</Text>
                         </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
+            </View>
+            </View>
+          </View>
                 ))}
-              </View>
+        </View>
             )}
           </View>
         )}
         ListFooterComponent={
-          <View style={styles.commentInputContainer}>
-            {replyingTo && (
-              <View style={styles.replyingToContainer}>
-                <Text style={styles.replyingToText}>
+      <View style={styles.commentInputContainer}>
+          {replyingTo && (
+            <View style={styles.replyingToContainer}>
+              <Text style={styles.replyingToText}>
                   Respondiendo a {replyingTo.user?.name || 'Usuario'}
-                </Text>
-                <TouchableOpacity onPress={() => setReplyingTo(null)}>
+              </Text>
+              <TouchableOpacity onPress={() => setReplyingTo(null)}>
                   <Ionicons name="close" size={16} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-            )}
-            <TextInput
+              </TouchableOpacity>
+            </View>
+          )}
+          <TextInput
               ref={inputRef}
-              style={styles.commentInput}
+            style={styles.commentInput}
               placeholder={replyingTo ? "Escribe una respuesta..." : "Escribe un comentario..."}
               value={commentText}
               onChangeText={setCommentText}
-            />
-            <TouchableOpacity
+          />
+          <TouchableOpacity
               style={[styles.commentButton, !commentText.trim() && styles.commentButtonDisabled]}
               onPress={handleComment}
               disabled={!commentText.trim() || isSubmitting}
             >
               <Text style={styles.commentButtonText}>Enviar</Text>
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
+        </View>
         }
       />
 
@@ -475,7 +475,7 @@ const PostDetailScreen = () => {
               <Text>Archivar</Text>
             </TouchableOpacity>
             {post.user._id === userId && (
-              <TouchableOpacity
+            <TouchableOpacity 
                 style={styles.modalOption}
                 onPress={() => {
                   setShowOptions(false);

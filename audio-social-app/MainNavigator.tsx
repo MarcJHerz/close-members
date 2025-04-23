@@ -5,6 +5,9 @@ import { NavigationContainer } from '@react-navigation/native';
 import { theme } from './src/theme';
 import { MenuProvider } from 'react-native-popup-menu';
 import { Ionicons } from '@expo/vector-icons';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import ProfileOptionsSheet from './src/components/ProfileOptionsSheet';
 
 
 // ✅ Importar pantallas
@@ -56,8 +59,12 @@ export type RootStackParamList = {
   SubscribeCommunity: { communityId: string };
   EditPost: { postId: string };
   ExploreScreen: undefined;
-
-
+  Settings: undefined;
+  Notifications: undefined;
+  Saved: undefined;
+  Stats: undefined;
+  Help: undefined;
+  ProfileOptions: undefined;
 };
 
 export type BottomTabParamList = {
@@ -141,6 +148,20 @@ function RootNavigator() {
       <Stack.Screen name="SubscribeCommunity" component={SubscribeCommunityScreen} options={{ title: 'Unirse a la comunidad' }} />
       <Stack.Screen name="EditPost" component={EditPostScreen} options={{ title: 'Editar Post' }} />
       <Stack.Screen name="ExploreScreen" component={ExploreScreen}/>
+      <Stack.Screen name="Settings" component={EditProfileScreen} options={{ title: 'Configuración' }} />
+      <Stack.Screen name="Notifications" component={EditProfileScreen} options={{ title: 'Notificaciones' }} />
+      <Stack.Screen name="Saved" component={EditProfileScreen} options={{ title: 'Guardados' }} />
+      <Stack.Screen name="Stats" component={EditProfileScreen} options={{ title: 'Estadísticas' }} />
+      <Stack.Screen name="Help" component={EditProfileScreen} options={{ title: 'Ayuda y soporte' }} />
+      <Stack.Screen 
+        name="ProfileOptions" 
+        component={ProfileOptionsSheet}
+        options={{
+          presentation: 'transparentModal',
+          animation: 'slide_from_bottom',
+          headerShown: false,
+        }}
+      />
     </Stack.Navigator>
   );
 }
@@ -148,11 +169,15 @@ function RootNavigator() {
 // ✅ Exportar `MainNavigator` asegurando la estructura correcta
 export default function MainNavigator() {
   return (
-    <MenuProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
-    </MenuProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <BottomSheetModalProvider>
+        <NavigationContainer>
+          <MenuProvider>
+            <RootNavigator />
+          </MenuProvider>
+        </NavigationContainer>
+      </BottomSheetModalProvider>
+    </GestureHandlerRootView>
   );
 }
 
