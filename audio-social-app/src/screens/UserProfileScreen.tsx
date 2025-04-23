@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, Image, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert, FlatList, Linking
+  TouchableOpacity, ActivityIndicator, Alert, FlatList, Linking, Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../theme';
@@ -11,6 +11,9 @@ import { NavigationProp, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../MainNavigator';
 
 const API_URL = 'http://192.168.1.87:5000';
+const HEADER_HEIGHT = 180;
+const PROFILE_IMAGE_SIZE = 90;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface User {
   _id: string;
@@ -64,7 +67,7 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ route, navigation
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('posts');
   const [posts, setPosts] = useState<Post[]>([]);
-  const [joinedCommunities, setJoinedCommunities] = useState<Community[]>([]);
+  const [allies, setAllies] = useState<User[]>([]);
   const [createdCommunities, setCreatedCommunities] = useState<Community[]>([]);
 
   useEffect(() => {
@@ -91,7 +94,7 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ route, navigation
       await Promise.all([
         fetchUserPosts(userId),
         fetchCreatedCommunities(userId),
-        fetchJoinedCommunities(userId)
+        fetchAllies(userId)
       ]);
 
     } catch (error) {
@@ -121,16 +124,16 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ route, navigation
     }
   };
 
-  const fetchJoinedCommunities = async (userId: string) => {
+  const fetchAllies = async (userId: string) => {
     try {
       const token = await AsyncStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/api/subscriptions/by-user`, {
+      const response = await axios.get(`${API_URL}/api/allies/my-allies`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setJoinedCommunities(response.data);
+      setAllies(response.data.allies);
     } catch (error) {
-      console.error('Error al obtener comunidades suscritas:', error);
-      setJoinedCommunities([]);
+      console.error('Error al obtener aliados:', error);
+      setAllies([]);
     }
   };
 
@@ -200,7 +203,7 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ route, navigation
   if (!user) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>No se pudo cargar el perfil</Text>
+        <Text style={styles.errorText}>Usuario no encontrado</Text>
       </View>
     );
   }
@@ -210,7 +213,7 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ route, navigation
       case 'posts':
         return posts;
       case 'joined':
-        return joinedCommunities;
+        return createdCommunities;
       case 'created':
         return createdCommunities;
       default:
@@ -232,123 +235,136 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ route, navigation
   };
 
   return (
-    <ScrollView 
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-    >
-      <View style={styles.bannerContainer}>
-        <Image
-          source={{ uri: formatImageUrl(user.bannerImage) }}
-          style={styles.banner}
-        />
-      </View>
-
-      <View style={styles.profileContainer}>
-        <Image 
-          source={{ uri: formatImageUrl(user.profilePicture) }}
-          style={styles.profileImage}
-        />
-        
-        <View style={styles.userInfo}>
-          <Text style={styles.name}>{user.name}</Text>
-          <Text style={styles.username}>@{user.username}</Text>
-          {user.category && (
-            <Text style={styles.category}>{user.category}</Text>
-          )}
+    <View style={styles.container}>
+      <ScrollView 
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Banner Section */}
+        <View style={styles.bannerContainer}>
+          <Image
+            source={{ uri: formatImageUrl(user?.bannerImage) }}
+            style={styles.bannerImage}
+          />
         </View>
 
-        {user.bio && (
-          <Text style={styles.bio}>{user.bio}</Text>
-        )}
-
-        {user.links && user.links.length > 0 && (
-          <View style={styles.linksContainer}>
-            {user.links.map((link, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.linkButton}
-                onPress={() => handleLinkPress(link)}
-              >
-                <Ionicons name="link-outline" size={16} color={theme.colors.primary} />
-                <Text style={styles.linkText}>{link}</Text>
+        {/* Profile Info Section */}
+        <View style={styles.profileSection}>
+          <View style={styles.profileTopSection}>
+            <Image 
+              source={{ uri: formatImageUrl(user?.profilePicture) }}
+              style={styles.profilePicture}
+            />
+            <View style={styles.statsContainer}>
+              <TouchableOpacity style={styles.statItem}>
+                <Text style={styles.statNumber}>{posts.length}</Text>
+                <Text style={styles.statLabel}>Posts</Text>
               </TouchableOpacity>
-            ))}
+              <TouchableOpacity style={styles.statItem}>
+                <Text style={styles.statNumber}>{allies.length}</Text>
+                <Text style={styles.statLabel}>Aliados</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.statItem}>
+                <Text style={styles.statNumber}>{createdCommunities.length}</Text>
+                <Text style={styles.statLabel}>Creado</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        )}
-      </View>
 
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
-          onPress={() => setActiveTab('posts')}
-        >
-          <Ionicons 
-            name="document-text-outline" 
-            size={24} 
-            color={activeTab === 'posts' ? theme.colors.primary : '#666'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'posts' && styles.activeTabText]}>
-            Posts
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'joined' && styles.activeTab]}
-          onPress={() => setActiveTab('joined')}
-        >
-          <Ionicons 
-            name="people-outline" 
-            size={24} 
-            color={activeTab === 'joined' ? theme.colors.primary : '#666'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'joined' && styles.activeTabText]}>
-            Unido
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'created' && styles.activeTab]}
-          onPress={() => setActiveTab('created')}
-        >
-          <Ionicons 
-            name="add-circle-outline" 
-            size={24} 
-            color={activeTab === 'created' ? theme.colors.primary : '#666'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'created' && styles.activeTabText]}>
-            Creado
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.userInfoContainer}>
+            <View style={styles.nameSection}>
+              <Text style={styles.userName}>{user?.name}</Text>
+              <Text style={styles.userHandle}>@{user?.username}</Text>
+            </View>
+            {user?.category && (
+              <View style={styles.categoryContainer}>
+                <Text style={styles.categoryText}>{user.category}</Text>
+              </View>
+            )}
+            {user?.bio && (
+              <Text style={styles.bio} numberOfLines={3}>
+                {user.bio}
+              </Text>
+            )}
+          </View>
+        </View>
 
-      <FlatList<BaseItem>
-        data={getCurrentData()}
-        renderItem={({ item }) => {
-          if (activeTab === 'posts') {
-            return renderPost({ item: item as Post });
-          }
-          return renderCommunity({ item: item as Community });
-        }}
-        keyExtractor={item => item._id}
-        contentContainerStyle={styles.contentList}
-        scrollEnabled={false}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>{getEmptyMessage()}</Text>
-        }
-      />
-    </ScrollView>
+        {/* Tabs Section */}
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
+            onPress={() => setActiveTab('posts')}
+          >
+            <Ionicons 
+              name="grid-outline" 
+              size={24} 
+              color={activeTab === 'posts' ? theme.colors.primary : '#666'} 
+            />
+            <Text style={[styles.tabText, activeTab === 'posts' && styles.activeTabText]}>
+              Posts
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'joined' && styles.activeTab]}
+            onPress={() => setActiveTab('joined')}
+          >
+            <Ionicons 
+              name="people-outline" 
+              size={24} 
+              color={activeTab === 'joined' ? theme.colors.primary : '#666'} 
+            />
+            <Text style={[styles.tabText, activeTab === 'joined' && styles.activeTabText]}>
+              Unido
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'created' && styles.activeTab]}
+            onPress={() => setActiveTab('created')}
+          >
+            <Ionicons 
+              name="add-circle-outline" 
+              size={24} 
+              color={activeTab === 'created' ? theme.colors.primary : '#666'} 
+            />
+            <Text style={[styles.tabText, activeTab === 'created' && styles.activeTabText]}>
+              Creado
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Content Section */}
+        <View style={styles.contentContainer}>
+          <FlatList
+            data={getCurrentData()}
+            renderItem={({ item }) => {
+              if (activeTab === 'posts') {
+                return renderPost({ item: item as Post });
+              }
+              return renderCommunity({ item: item as Community });
+            }}
+            keyExtractor={item => item._id}
+            scrollEnabled={false}
+            ListEmptyComponent={
+              <Text style={styles.emptyText}>{getEmptyMessage()}</Text>
+            }
+          />
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
-  contentContainer: {
-    flexGrow: 1,
+  scrollView: {
+    flex: 1,
   },
-  loadingContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   errorContainer: {
@@ -361,72 +377,96 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   bannerContainer: {
-    height: 200,
+    height: HEADER_HEIGHT,
+    width: SCREEN_WIDTH,
+    position: 'relative',
   },
-  banner: {
+  bannerImage: {
     width: '100%',
     height: '100%',
+    backgroundColor: '#ddd',
   },
-  profileContainer: {
+  profileSection: {
     padding: 16,
-    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
-  profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 4,
-    borderColor: '#fff',
-    marginTop: -50,
-  },
-  userInfo: {
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 16,
-  },
-  name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  username: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 4,
-  },
-  category: {
-    fontSize: 16,
-    color: theme.colors.primary,
-    marginTop: 4,
-  },
-  bio: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  linksContainer: {
-    width: '100%',
-    paddingHorizontal: 16,
-  },
-  linkButton: {
+  profileTopSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
-    marginBottom: 8,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
+    marginTop: -PROFILE_IMAGE_SIZE/2,
   },
-  linkText: {
-    marginLeft: 8,
-    color: theme.colors.primary,
+  profilePicture: {
+    width: PROFILE_IMAGE_SIZE,
+    height: PROFILE_IMAGE_SIZE,
+    borderRadius: PROFILE_IMAGE_SIZE / 2,
+    borderWidth: 4,
+    borderColor: theme.colors.surface,
+    marginRight: 20,
+  },
+  statsContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+  },
+  statItem: {
+    alignItems: 'center',
+    paddingHorizontal: 5,
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  userInfoContainer: {
+    marginTop: 16,
+  },
+  nameSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginRight: 8,
+  },
+  userHandle: {
     fontSize: 14,
+    color: theme.colors.textSecondary,
+  },
+  categoryContainer: {
+    backgroundColor: theme.colors.primary + '15',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  categoryText: {
+    color: theme.colors.primary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  bio: {
+    fontSize: 14,
+    color: theme.colors.text,
+    lineHeight: 20,
+    marginTop: 8,
   },
   tabsContainer: {
     flexDirection: 'row',
+    backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    marginBottom: 16,
+    borderBottomColor: theme.colors.border,
   },
   tab: {
     flex: 1,
@@ -439,20 +479,21 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 12,
-    color: '#666',
+    color: theme.colors.textSecondary,
     marginTop: 4,
   },
   activeTabText: {
     color: theme.colors.primary,
     fontWeight: 'bold',
   },
-  contentList: {
-    padding: 16,
+  contentContainer: {
+    padding: 12,
   },
   emptyText: {
-    textAlign: 'center',
+    fontSize: 16,
     color: '#666',
-    marginTop: 20,
+    textAlign: 'center',
+    marginTop: 16,
   },
   postCard: {
     backgroundColor: '#fff',
