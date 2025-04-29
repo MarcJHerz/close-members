@@ -1,48 +1,16 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share, Dimensions } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Share, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../theme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../MainNavigator';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 const ProfileOptionsSheet: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const translateY = useSharedValue(0);
-
-  useEffect(() => {
-    console.log('ProfileOptionsSheet montado');
-    return () => {
-      console.log('ProfileOptionsSheet desmontado');
-    };
-  }, []);
-
-  const gesture = Gesture.Pan()
-    .onUpdate((event) => {
-      if (event.translationY > 0) {
-        translateY.value = event.translationY;
-      }
-    })
-    .onEnd((event) => {
-      if (event.translationY > 50) {
-        navigation.goBack();
-      } else {
-        translateY.value = withSpring(0);
-      }
-    });
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateY: translateY.value }],
-    };
-  });
 
   const handleLogout = async () => {
     try {
@@ -58,36 +26,43 @@ const ProfileOptionsSheet: React.FC = () => {
 
   const handleShareProfile = async () => {
     try {
-      navigation.goBack();
       const result = await Share.share({
         message: 'Mira mi perfil en Close Members',
         url: 'https://closemembers.app/profile/username',
       });
       
       if (result.action === Share.sharedAction) {
-        console.log('Compartido exitosamente');
+        navigation.goBack();
       }
     } catch (error) {
       console.log('Error al compartir:', error);
     }
   };
 
+  const handleEditProfile = () => {
+    navigation.goBack();
+    setTimeout(() => {
+      navigation.navigate('EditProfile');
+    }, 100);
+  };
+
   return (
     <View style={styles.container}>
       <TouchableOpacity 
-        style={styles.overlay}
+        style={styles.overlay} 
         activeOpacity={1}
         onPress={() => navigation.goBack()}
       />
-      <GestureDetector gesture={gesture}>
-        <Animated.View style={[styles.content, animatedStyle]}>
+      <View style={styles.content}>
+        <View style={styles.handleContainer}>
           <View style={styles.handle} />
+        </View>
+        
+        <View style={styles.optionsContainer}>
           <TouchableOpacity
             style={styles.option}
-            onPress={() => {
-              navigation.goBack();
-              navigation.navigate('EditProfile');
-            }}
+            onPress={handleEditProfile}
+            activeOpacity={0.7}
           >
             <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
             <Text style={styles.optionText}>Configuración</Text>
@@ -96,6 +71,7 @@ const ProfileOptionsSheet: React.FC = () => {
           <TouchableOpacity
             style={styles.option}
             onPress={handleShareProfile}
+            activeOpacity={0.7}
           >
             <Ionicons name="share-outline" size={24} color={theme.colors.text} />
             <Text style={styles.optionText}>Compartir perfil</Text>
@@ -104,12 +80,13 @@ const ProfileOptionsSheet: React.FC = () => {
           <TouchableOpacity
             style={[styles.option, styles.logoutOption]}
             onPress={handleLogout}
+            activeOpacity={0.7}
           >
             <Ionicons name="log-out-outline" size={24} color={theme.colors.error} />
             <Text style={[styles.optionText, styles.logoutText]}>Cerrar sesión</Text>
           </TouchableOpacity>
-        </Animated.View>
-      </GestureDetector>
+        </View>
+      </View>
     </View>
   );
 };
@@ -117,27 +94,48 @@ const ProfileOptionsSheet: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+    backgroundColor: 'transparent',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   content: {
     backgroundColor: theme.colors.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 16,
-    paddingBottom: 32,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 32,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {
+          width: 0,
+          height: -2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  },
+  handleContainer: {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
   handle: {
     width: 40,
     height: 4,
-    backgroundColor: theme.colors.text,
+    backgroundColor: theme.colors.border,
     borderRadius: 2,
     alignSelf: 'center',
-    marginBottom: 16,
+  },
+  optionsContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
   option: {
     flexDirection: 'row',

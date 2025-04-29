@@ -60,16 +60,28 @@ interface Comment {
 
 interface Post {
   _id: string;
-  community?: string;
+  community?: {
+    _id: string;
+    name: string;
+    coverImage?: string;
+  };
   user: User;
   text: string;
   media: Media[];
   likes: string[];
   comments: Comment[];
   createdAt: string;
+  postType: 'general' | 'community';
 }
 
-type PostDetailRouteProp = RouteProp<RootStackParamList, 'PostDetail'>;
+interface PostDetailRouteProp extends RouteProp<RootStackParamList, 'PostDetail'> {
+  params: {
+    postId: string;
+    communityId?: string;
+    fromScreen?: string;
+    previousScreen?: string;
+  };
+}
 
 const defaultProfileImage = 'https://miro.medium.com/v2/resize:fit:1400/format:webp/0*0JcYeLzvORp67c6w.jpg';
 
@@ -91,7 +103,7 @@ const formatDate = (dateString: string) => {
 const PostDetailScreen = () => {
   const route = useRoute<PostDetailRouteProp>();
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const { postId } = route.params;
+  const { postId, communityId } = route.params;
   
   const flatListRef = useRef<FlatList>(null);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -308,7 +320,7 @@ const PostDetailScreen = () => {
         ListHeaderComponent={
           <View style={styles.postContainer}>
             <View style={styles.userInfo}>
-          <Image
+              <Image
                 source={{ uri: post.user.profilePicture || 'https://via.placeholder.com/50' }} 
                 style={styles.profileImage} 
               />
@@ -317,13 +329,24 @@ const PostDetailScreen = () => {
                 <Text style={styles.postTime}>
                   {formatDate(post.createdAt)}
                 </Text>
-          </View>
+                {communityId && (
+                  <TouchableOpacity 
+                    style={styles.communityBadge}
+                    onPress={() => navigation.navigate('Community', { communityId })}
+                  >
+                    <Ionicons name="people" size={12} color={theme.colors.primary} />
+                    <Text style={styles.communityName}>
+                      {post.community?.name || 'Comunidad'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               {post.user._id === userId && (
                 <TouchableOpacity onPress={() => setShowOptions(true)} style={styles.optionsButton}>
                   <Text style={styles.optionsText}>⋯</Text>
                 </TouchableOpacity>
               )}
-        </View>
+            </View>
 
             {post.media?.[0] && (
               <Image
@@ -687,6 +710,21 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
+  },
+  communityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary + '15',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  communityName: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    marginLeft: 4,
   },
 });
 

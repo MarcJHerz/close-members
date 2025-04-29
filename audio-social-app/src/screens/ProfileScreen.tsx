@@ -12,6 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../MainNavigator';
 import { BottomSheetModal } from '@gorhom/bottom-sheet';
 import ProfileOptionsSheet from '../components/ProfileOptionsSheet';
+import UserBadgeDisplay from '../components/UserBadgeDisplay';
+import UserBadgesModal from '../components/UserBadgesModal';
 
 interface Post {
   _id: string;
@@ -19,7 +21,11 @@ interface Post {
   media?: { url: string; type: string }[];
   likes: string[];
   createdAt?: string;
-  community?: string;
+  community?: {
+    _id: string;
+    name: string;
+    coverImage?: string;
+  };
 }
 
 interface Community {
@@ -60,15 +66,35 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [generalPosts, setGeneralPosts] = useState<Post[]>([]);
+  const [badgesModalVisible, setBadgesModalVisible] = useState(false);
+  const [userBadges, setUserBadges] = useState([]);
 
   // Ref for the bottom sheet
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
 
   // Callbacks for the bottom sheet
   const handlePresentModalPress = useCallback(() => {
-    console.log('Navegando a ProfileOptions...');
-    navigation.navigate('ProfileOptions');
+    try {
+      navigation.navigate('ProfileOptions');
+    } catch (error) {
+      console.error('Error al abrir opciones:', error);
+    }
   }, [navigation]);
+
+  const handleOpenBadgesModal = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token || !user?._id) return;
+      const res = await axios.get(`http://192.168.1.87:5000/api/users/${user._id}/badges`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUserBadges(res.data);
+      setBadgesModalVisible(true);
+    } catch (err) {
+      setUserBadges([]);
+      setBadgesModalVisible(true);
+    }
+  };
 
   useEffect(() => {
     console.log('ProfileScreen montado');
@@ -111,11 +137,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   const fetchUserPosts = async (userId: string) => {
     try {
-      const res = await axios.get(`${API_URL}/api/posts/user/${userId}`);
-      console.log(`✅ ${res.data.length} publicaciones cargadas`);
-      setPosts(res.data);
+      const token = await AsyncStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/api/posts/user/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setPosts(response.data);
     } catch (error) {
-      console.error('❌ Error al obtener publicaciones:', error);
+      console.error('Error fetching user posts:', error);
     }
   };
 
@@ -180,22 +208,41 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   const renderItem = ({ item }: { item: ContentItem }) => {
     if (activeTab === 'posts' || activeTab === 'general') {
-      const postItem = item as Post;
+      const post = item as Post;
       return (
         <TouchableOpacity 
-          key={`post-${postItem._id}`}
-          style={styles.card} 
-          onPress={() => navigation.navigate('PostDetail', { postId: postItem._id })}
+          style={styles.card}
+          onPress={() => navigation.navigate('PostDetail', { 
+            postId: post._id,
+            communityId: post.community?._id,
+            fromScreen: 'Profile'
+          })}
         >
-          {postItem.media?.[0] && (
+          {post.media && post.media.length > 0 && (
             <Image 
-              source={{ uri: formatImageUrl(postItem.media[0].url) }} 
+              source={{ uri: formatImageUrl(post.media[0].url) }} 
               style={styles.postImage} 
             />
           )}
-          <Text style={styles.postText} numberOfLines={3}>{postItem.text}</Text>
+          <Text style={styles.postText}>{post.text}</Text>
+          {post.community && (
+            <TouchableOpacity 
+              style={styles.communityBadge}
+              onPress={() => {
+                if (post.community?._id) {
+                  navigation.navigate('Community', { 
+                    communityId: post.community._id,
+                    fromScreen: 'Profile'
+                  });
+                }
+              }}
+            >
+              <Ionicons name="people-outline" size={14} color={theme.colors.primary} />
+              <Text style={styles.communityBadgeText}>{post.community?.name}</Text>
+            </TouchableOpacity>
+          )}
           <View style={styles.postFooter}>
-            <Text style={styles.likeCount}>{postItem.likes?.length || 0} likes</Text>
+            <Text style={styles.likeCount}>{post.likes?.length || 0} likes</Text>
           </View>
         </TouchableOpacity>
       );
@@ -257,6 +304,15 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     setRefreshing(false);
   }, []);
 
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <Image
+        source={{ uri: formatImageUrl(user?.profilePicture) }}
+        style={styles.profilePicture}
+      />
+    </View>
+  );
+
   if (loading && !user) {
     return (
       <View style={styles.loadingContainer}>
@@ -286,33 +342,22 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
             onPress={handlePresentModalPress}
             activeOpacity={0.7}
           >
-            <Ionicons name="menu-outline" size={24} color="#FFF" />
+            <Ionicons name="menu-outline" size={24} color={theme.colors.primary} />
           </TouchableOpacity>
         </View>
 
         {/* Profile Info Section */}
         <View style={styles.profileSection}>
-          <View style={styles.profileTopSection}>
-            <Image 
+          <View style={styles.profileTopSectionRow}>
+            <Image
               source={{ uri: formatImageUrl(user?.profilePicture) }}
               style={styles.profilePicture}
             />
-            <View style={styles.statsContainer}>
-              <TouchableOpacity style={styles.statItem}>
-                <Text style={styles.statNumber}>{posts.length}</Text>
-                <Text style={styles.statLabel}>Posts</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.statItem}>
-                <Text style={styles.statNumber}>{allies.length}</Text>
-                <Text style={styles.statLabel}>Aliados</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.statItem}>
-                <Text style={styles.statNumber}>{communitiesCreated.length}</Text>
-                <Text style={styles.statLabel}>Comunidades</Text>
-              </TouchableOpacity>
-            </View>
+            <UserBadgeDisplay iconName={user?.mainBadgeIcon || 'founder'} onPress={handleOpenBadgesModal} />
           </View>
-
+          <TouchableOpacity onPress={handleOpenBadgesModal} style={{ alignSelf: 'flex-end', marginRight: 8, marginTop: 2 }}>
+            <Text style={{ color: '#007aff', fontWeight: '600' }}>Ver todos los logros</Text>
+          </TouchableOpacity>
           <View style={styles.userInfoContainer}>
             <View style={styles.nameSection}>
               <Text style={styles.userName}>{user?.name}</Text>
@@ -329,6 +374,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
               </Text>
             )}
           </View>
+          <UserBadgesModal visible={badgesModalVisible} onClose={() => setBadgesModalVisible(false)} userBadges={userBadges} />
         </View>
 
         {/* Tabs Section */}
@@ -418,9 +464,17 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: theme.colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   profileSection: {
     padding: 16,
@@ -428,11 +482,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
-  profileTopSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: -PROFILE_IMAGE_SIZE/2,
-  },
+  profileTopSectionRow: { flexDirection: 'row', alignItems: 'center', marginTop: -PROFILE_IMAGE_SIZE/2, justifyContent: 'space-between' },
   profilePicture: {
     width: PROFILE_IMAGE_SIZE,
     height: PROFILE_IMAGE_SIZE,
@@ -441,39 +491,17 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.surface,
     marginRight: 20,
   },
-  statsContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 10,
-  },
-  statItem: {
-    alignItems: 'center',
-    paddingHorizontal: 5,
-  },
-  statNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: theme.colors.text,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginTop: 2,
-  },
   userInfoContainer: {
     marginTop: 16,
   },
   nameSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   userName: {
     fontSize: 20,
     fontWeight: 'bold',
     color: theme.colors.text,
-    marginRight: 8,
+    marginBottom: 2,
   },
   userHandle: {
     fontSize: 14,
@@ -564,40 +592,68 @@ const styles = StyleSheet.create({
     color: '#888',
   },
   communityCard: {
-    flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 10,
-    marginBottom: 12,
+    borderRadius: 16,
+    marginBottom: 20,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#eee',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   communityImage: {
-    width: 100,
-    height: 100,
+    width: '100%',
+    height: 160,
+    backgroundColor: '#f0f0f0',
   },
   communityInfo: {
-    flex: 1,
-    padding: 10,
-    justifyContent: 'space-between',
+    padding: 16,
   },
   communityName: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: 'bold',
+    color: '#1a1a1a',
+    marginBottom: 8,
   },
   communityDesc: {
-    fontSize: 12,
+    fontSize: 15,
     color: '#666',
-    marginVertical: 4,
+    lineHeight: 22,
+    marginBottom: 12,
   },
   memberCount: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
   },
   memberText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
-    marginLeft: 4,
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: -PROFILE_IMAGE_SIZE/2,
+  },
+  communityBadge: {
+    backgroundColor: theme.colors.primary + '15',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+  },
+  communityBadgeText: {
+    color: theme.colors.primary,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 

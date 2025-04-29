@@ -5,24 +5,17 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, NavigationProp, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../MainNavigator';
 import { theme } from '../theme';
 import { Ionicons } from '@expo/vector-icons';
-
-type Community = {
-  _id: string;
-  name: string;
-  description: string;
-  coverImage?: string;
-  members: string[];
-  creator: { _id: string; name: string; profilePicture?: string };
-};
+import { Community } from '../types';
 
 const API_URL = 'http://192.168.1.87:5000';
 
 export default function CommunitiesScreen() {
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [activeTab, setActiveTab] = useState<'created' | 'subscribed'>('created');
   const [userId, setUserId] = useState<string | null>(null);
   const [created, setCreated] = useState<Community[]>([]);
@@ -192,7 +185,6 @@ export default function CommunitiesScreen() {
               <Image
                 source={{ uri: formatImageUrl(item.coverImage) }}
                 style={styles.coverImage}
-                
               />
               <View style={styles.infoContainer}>
                 <Text style={styles.name}>{item.name}</Text>

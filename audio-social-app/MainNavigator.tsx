@@ -23,7 +23,7 @@ import EditProfileScreen from './src/screens/EditProfileScreen';
 import UserProfileScreen from './src/screens/UserProfileScreen';
 import CommunitiesScreen from './src/screens/CommunitiesScreen';
 import SubscriptionsScreen from './src/screens/SubscriptionsScreen';
-import PostDetailScreen from './src/screens/PostDetailScreen'; // ✅ Agrega esta línea
+import PostDetailScreen from './src/screens/PostDetailScreen';
 import CreatePostScreen from './src/screens/CreatePostScreen';
 import CreateCommunityScreen from './src/screens/CreateCommunityScreen';
 import EditCommunityScreen from './src/screens/EditCommunityScreen';
@@ -47,12 +47,26 @@ export type RootStackParamList = {
     description?: string;
     uploadedBy: string;
   };
-  Community: { communityId: string }; // ✅ Corregido (Antes era "CommunityScreen")
-  PostDetail: { postId: string }; // ✅ Agregar esta línea
+  Community: { 
+    communityId: string; 
+    fromScreen?: string;
+    previousScreen?: string;
+    initialTab?: 'posts' | 'members' | 'about';
+  };
+  PostDetail: { 
+    postId: string;
+    communityId?: string;
+    fromScreen?: string;
+    previousScreen?: string;
+  };
   Subscriptions: undefined;
   EditProfile: undefined;
   Profile: { userId?: string } | undefined;
-  UserProfile: { userId: string };
+  UserProfile: { 
+    userId: string; 
+    fromScreen?: string;
+    previousScreen?: string;
+  };
   CreatePost: { communityId: string };
   CreateCommunity: undefined;
   EditCommunity: { communityId: string };
@@ -136,7 +150,17 @@ function RootNavigator() {
       <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Home" component={BottomTabs} options={{ headerShown: false }} />
       <Stack.Screen name="Details" component={DetailScreen} options={{ title: 'Detalles' }} />
-      <Stack.Screen name="Community" component={CommunityScreen} options={{ headerShown: false }} /> 
+      <Stack.Screen 
+        name="Community" 
+        component={CommunityScreen} 
+        options={{ 
+          headerShown: false,
+          presentation: 'card',
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+          gestureDirection: 'horizontal',
+        }} 
+      />
       <Stack.Screen name="PostDetail" component={PostDetailScreen} options={{ headerShown: false }} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ title: 'Editar Perfil' }} />
       <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
@@ -167,16 +191,16 @@ function RootNavigator() {
 }
 
 // ✅ Exportar `MainNavigator` asegurando la estructura correcta
-export default function MainNavigator() {
+export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <BottomSheetModalProvider>
-        <NavigationContainer>
-          <MenuProvider>
+      <NavigationContainer>
+        <MenuProvider>
+          <BottomSheetModalProvider>
             <RootNavigator />
-          </MenuProvider>
-        </NavigationContainer>
-      </BottomSheetModalProvider>
+          </BottomSheetModalProvider>
+        </MenuProvider>
+      </NavigationContainer>
     </GestureHandlerRootView>
   );
 }

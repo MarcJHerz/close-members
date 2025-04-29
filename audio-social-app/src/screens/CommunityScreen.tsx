@@ -12,6 +12,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { RouteProp, useRoute, useNavigation, NavigationProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../../MainNavigator';
@@ -49,8 +50,8 @@ const API_URL = 'http://192.168.1.87:5000';
 
 export default function CommunityScreen() {
   const route = useRoute<CommunityScreenRouteProp>();
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const { communityId } = route.params;
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { communityId, fromScreen, previousScreen } = route.params;
   
   const [community, setCommunity] = useState<Community | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -71,7 +72,7 @@ export default function CommunityScreen() {
       fetchPosts();
       checkSubscription();
     }
-  }, [userId]);
+  }, [userId, communityId]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -222,6 +223,22 @@ export default function CommunityScreen() {
     return `${API_URL}/${url.replace(/^\//, '')}`;
   };
 
+  const handleMemberPress = (memberId: string) => {
+    navigation.push('UserProfile', {
+      userId: memberId,
+      fromScreen: 'Community',
+      previousScreen: previousScreen || fromScreen
+    });
+  };
+
+  const handleCommunityPress = (newCommunityId: string) => {
+    navigation.push('Community', {
+      communityId: newCommunityId,
+      fromScreen: 'Community',
+      previousScreen: previousScreen || fromScreen
+    });
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -327,12 +344,7 @@ export default function CommunityScreen() {
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={styles.memberCard}
-                onPress={() =>
-                  navigation.navigate(
-                    item._id === userId ? 'Profile' : 'UserProfile',
-                    { userId: item._id }
-                  )
-                }
+                onPress={() => handleMemberPress(item._id)}
               >
                 <Image
                   source={{ uri: formatImageUrl(item.profilePicture, 'https://via.placeholder.com/100') }}
@@ -384,10 +396,7 @@ export default function CommunityScreen() {
           <View key={item._id} style={styles.postCard}>
             <TouchableOpacity 
               style={styles.postHeader}
-              onPress={() => navigation.navigate(
-                item.user._id === userId ? 'Profile' : 'UserProfile',
-                { userId: item.user._id }
-              )}
+              onPress={() => handleMemberPress(item.user._id)}
             >
               <Image 
                 source={{ uri: formatImageUrl(item.user.profilePicture) }} 

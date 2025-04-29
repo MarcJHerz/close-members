@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../MainNavigator';
 import { theme } from '../theme';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Post {
   _id: string;
@@ -18,6 +19,12 @@ interface Post {
     name: string;
     profilePicture?: string;
   };
+  community?: {
+    _id: string;
+    name: string;
+    coverImage?: string;
+  };
+  postType: 'general' | 'community';
   createdAt: string;
 }
 
@@ -41,16 +48,18 @@ export default function HomeScreen() {
       });
       const uid = res.data._id;
       setUserId(uid);
-      fetchFeed();
+      await fetchFeed(uid);
     } catch (error) {
       console.error('❌ Error al obtener usuario autenticado:', error);
     }
   };
 
-  const fetchFeed = async () => {
+  const fetchFeed = async (currentUserId: string) => {
     try {
       const token = await AsyncStorage.getItem('token');
-      const res = await axios.get('http://192.168.1.87:5000/api/posts/feed/alliances', {
+      if (!token) return;
+      
+      const res = await axios.get(`http://192.168.1.87:5000/api/posts/home/${currentUserId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
   
@@ -61,7 +70,13 @@ export default function HomeScreen() {
       setLoading(false);
     }
   };
-  
+
+  const handlePostPress = (post: Post) => {
+    navigation.navigate('PostDetail', { 
+      postId: post._id,
+      communityId: post.postType === 'community' ? post.community?._id : undefined
+    });
+  };
 
   if (loading) {
     return (
@@ -91,7 +106,7 @@ export default function HomeScreen() {
           ListEmptyComponent={<Text style={styles.emptyText}>Aún no hay publicaciones de tus Aliados.</Text>}
           renderItem={({ item }) => (
             <TouchableOpacity
-              onPress={() => navigation.navigate('PostDetail', { postId: item._id })}
+              onPress={() => handlePostPress(item)}
               style={styles.postCard}
             >
               <View style={styles.header}>
@@ -108,7 +123,15 @@ export default function HomeScreen() {
                     source={{ uri: item.user.profilePicture || 'https://via.placeholder.com/50' }}
                     style={styles.avatar}
                   />
-                  <Text style={styles.author}>{item.user.name || 'Usuario'}</Text>
+                  <View>
+                    <Text style={styles.author}>{item.user.name || 'Usuario'}</Text>
+                    {item.postType === 'community' && item.community && (
+                      <View style={styles.communityBadge}>
+                        <Ionicons name="people" size={12} color={theme.colors.primary} />
+                        <Text style={styles.communityName}>{item.community.name}</Text>
+                      </View>
+                    )}
+                  </View>
                 </TouchableOpacity>
               </View>
 
@@ -124,7 +147,7 @@ export default function HomeScreen() {
         />
       ) : (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Aquí verás tus publicaciones guardadas 🧡</Text>
+          <Text style={styles.emptyText}>No hay publicaciones guardadas.</Text>
         </View>
       )}
     </View>
@@ -159,6 +182,20 @@ const styles = StyleSheet.create({
   profileInfo: { flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
   author: { fontSize: 16, fontWeight: 'bold', color: theme.colors.text },
+  communityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary + '15',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  communityName: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    marginLeft: 4,
+  },
   image: { width: '100%', height: 200, borderRadius: 10, marginBottom: 10 },
   text: { fontSize: 15, color: theme.colors.text },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
