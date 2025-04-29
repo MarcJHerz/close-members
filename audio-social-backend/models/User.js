@@ -79,6 +79,11 @@ const userSchema = new mongoose.Schema({
   lastLogin: {
     type: Date,
     default: Date.now
+  },
+  mainBadgeIcon: {
+    type: String,
+    enum: ['founder', 'trophy', 'diamond', 'fire', 'calendar', 'heart', 'star', null],
+    default: null
   }
 });
 

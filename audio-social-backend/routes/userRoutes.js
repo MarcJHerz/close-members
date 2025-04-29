@@ -6,6 +6,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const verifyToken = require('../middleware/authMiddleware'); // Add this line to import verifyToken
+const Community = require('../models/Community');
 
 // 📌 Asegurar que las carpetas de imágenes existen
 const profilePicturesPath = 'uploads/profile_pictures/';
@@ -102,6 +103,16 @@ router.get('/profile', async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
+    // Buscar si el usuario es fundador de alguna comunidad
+    const isFounder = await Community.exists({ creator: user._id });
+    // Buscar si el usuario es miembro de alguna comunidad
+    const isMember = await Community.exists({ members: user._id });
+
+    let mainBadgeIcon = null;
+    if (isFounder) mainBadgeIcon = 'founder';
+    else if (isMember) mainBadgeIcon = 'trophy';
+    // Si no es fundador ni miembro, mainBadgeIcon queda null
+
     res.json({
       _id: user._id,
       name: user.name,
@@ -112,8 +123,9 @@ router.get('/profile', async (req, res) => {
       bio: user.bio || '',
       category: user.category || '',
       links: user.links || [],
-      profileBlocks: user.profileBlocks || [], // Make sure to include profileBlocks
+      profileBlocks: user.profileBlocks || [],
       subscriptionPrice: user.subscriptionPrice ?? 0,
+      mainBadgeIcon
     });
   } catch (error) {
     console.error('❌ Error al obtener el perfil:', error);
@@ -134,18 +146,28 @@ router.get('/profile/:userId', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
 
+    // Buscar si el usuario es fundador de alguna comunidad
+    const isFounder = await Community.exists({ creator: user._id });
+    // Buscar si el usuario es miembro de alguna comunidad
+    const isMember = await Community.exists({ members: user._id });
+
+    let mainBadgeIcon = null;
+    if (isFounder) mainBadgeIcon = 'founder';
+    else if (isMember) mainBadgeIcon = 'trophy';
+
     res.json({
       _id: user._id,
       name: user.name,
       username: user.username,
       email: user.email,
       profilePicture: user.profilePicture?.startsWith('http') ? user.profilePicture : `http://192.168.1.87:5000/${user.profilePicture}`,
-      bannerImage: user.bannerImage?.startsWith('http') ? user.bannerImage : `http://192.168.1.87:5000/${user.bannerImage}`,      
+      bannerImage: user.bannerImage?.startsWith('http') ? user.bannerImage : `http://192.168.1.87:5000/${user.bannerImage}`,
       bio: user.bio || '',
       category: user.category || '',
       links: user.links || [],
       profileBlocks: user.profileBlocks || [],
-      subscriptionPrice: user.subscriptionPrice ?? 0
+      subscriptionPrice: user.subscriptionPrice ?? 0,
+      mainBadgeIcon
     });
   } catch (error) {
     console.error('❌ Error al obtener perfil de usuario:', error);
@@ -274,6 +296,45 @@ router.post('/profile/upload-image', verifyToken, upload.single('image'), async 
   } catch (error) {
     console.error('❌ Error al subir imagen:', error);
     res.status(500).json({ error: 'Error al subir imagen' });
+  }
+});
+
+// Endpoint para obtener todos los badges/logros del usuario
+router.get('/:userId/badges', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) return res.status(400).json({ error: 'Falta el userId.' });
+
+    // Founder: comunidades donde es creator
+    const foundedCommunities = await Community.find({ creator: userId });
+    // Trophy: comunidades donde es miembro pero no creator
+    const memberCommunities = await Community.find({ members: userId, creator: { $ne: userId } });
+
+    // Puedes extender aquí para otros tipos de badges
+
+    const badges = [];
+    // Founder badges
+    for (const c of foundedCommunities) {
+      badges.push({
+        badgeId: 'founder',
+        dateEarned: c.createdAt,
+        community: { id: c._id, name: c.name }
+      });
+    }
+    // Trophy badges
+    for (const c of memberCommunities) {
+      badges.push({
+        badgeId: 'trophy',
+        dateEarned: c.createdAt, // O la fecha de unión si la tienes
+        community: { id: c._id, name: c.name }
+      });
+    }
+    // Aquí puedes agregar lógica para otros badges (donador, viral, etc)
+
+    res.json(badges);
+  } catch (error) {
+    console.error('❌ Error al obtener badges del usuario:', error);
+    res.status(500).json({ error: 'Error al obtener badges del usuario' });
   }
 });
 

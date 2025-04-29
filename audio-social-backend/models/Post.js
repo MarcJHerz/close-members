@@ -12,6 +12,12 @@ const PostSchema = new mongoose.Schema({
   media: [MediaSchema],  // ✅ Aceptamos un array de objetos `{ url, type }`
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   comments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Comment' }],
+  postType: { 
+    type: String, 
+    enum: ['general', 'community'], 
+    default: 'general',
+    required: true 
+  },
   createdAt: { type: Date, default: Date.now },
 });
 

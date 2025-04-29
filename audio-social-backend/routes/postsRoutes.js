@@ -45,14 +45,16 @@ router.post('/create', verifyToken, upload.single('media'), async (req, res) => 
     console.log('req.file:', req.file);
 
     const { communityId, text } = req.body;
+    const postType = communityId ? 'community' : 'general';
 
     const newPost = new Post({
       community: communityId,
       user: req.userId,
       text: text?.trim() || '',
+      postType: postType,
       media: req.file
         ? [{
-            url: req.file.path.replace(/\\/g, '/'), // para evitar backslashes en Window
+            url: req.file.path.replace(/\\/g, '/'),
             type: req.file.mimetype.startsWith('image') ? 'image' : 'video'
           }]
         : [],
@@ -296,6 +298,80 @@ router.get('/feed/alliances', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('❌ Error al obtener feed de aliados:', error);
     res.status(500).json({ error: 'Error al obtener feed' });
+  }
+});
+
+// 📌 Obtener posts para el HomeScreen (posts generales y de comunidad)
+router.get('/home/:userId', verifyToken, async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    // 1. Obtener todas las comunidades del usuario
+    const userCommunities = await Community.find({ members: userId });
+    const communityIds = userCommunities.map(c => c._id);
+
+    // 2. Obtener aliados del usuario
+    const allies = await Ally.find({
+      $or: [
+        { user1: userId },
+        { user2: userId }
+      ]
+    });
+
+    // 3. Obtener IDs de todos los aliados
+    const allyIds = allies.map(a => {
+      return a.user1.toString() === userId 
+        ? a.user2.toString() 
+        : a.user1.toString();
+    });
+
+    // 4. Obtener posts de aliados y de comunidades
+    const posts = await Post.find({
+      $or: [
+        // Posts generales de aliados
+        {
+          user: { $in: [...allyIds, userId] }, // Incluir posts del usuario actual
+          postType: 'general'
+        },
+        // Posts de comunidades a las que pertenece el usuario
+        {
+          community: { $in: communityIds },
+          postType: 'community'
+        }
+      ]
+    })
+    .populate('user', 'name username profilePicture')
+    .populate('community', 'name coverImage')
+    .sort({ createdAt: -1 });
+
+    // 5. Procesar los posts para incluir URLs completas
+    const processedPosts = posts.map(post => {
+      const processedPost = post.toObject();
+      
+      // Procesar imagen de perfil del usuario
+      if (processedPost.user && processedPost.user.profilePicture) {
+        processedPost.user.profilePicture = processedPost.user.profilePicture.startsWith('http')
+          ? processedPost.user.profilePicture
+          : `${process.env.BASE_URL}/${processedPost.user.profilePicture}`;
+      }
+
+      // Procesar imagen de portada de la comunidad si existe
+      if (processedPost.community && processedPost.community.coverImage) {
+        processedPost.community.coverImage = processedPost.community.coverImage.startsWith('http')
+          ? processedPost.community.coverImage
+          : `${process.env.BASE_URL}/${processedPost.community.coverImage}`;
+      }
+
+      return processedPost;
+    });
+
+    res.json(processedPosts);
+  } catch (error) {
+    console.error('❌ Error al obtener posts para HomeScreen:', error);
+    res.status(500).json({ 
+      error: 'Error al obtener los posts',
+      details: error.message 
+    });
   }
 });
 

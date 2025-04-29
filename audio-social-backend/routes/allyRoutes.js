@@ -194,4 +194,65 @@ router.post('/create-all-allies', verifyToken, async (req, res) => {
   }
 });
 
+// 🔹 Obtener aliados de un usuario específico
+router.get('/user/:userId', verifyToken, async (req, res) => {
+  try {
+    const allies = await Ally.find({
+      $or: [
+        { user1: req.params.userId },
+        { user2: req.params.userId }
+      ]
+    })
+    .populate('user1', 'name username profilePicture bio category')
+    .populate('user2', 'name username profilePicture bio category');
+    
+    const formattedAllies = allies.map(a => {
+      const allyUser = a.user1._id.toString() === req.params.userId.toString() ? a.user2 : a.user1;
+      return {
+        _id: allyUser._id,
+        name: allyUser.name,
+        username: allyUser.username,
+        profilePicture: allyUser.profilePicture,
+        bio: allyUser.bio,
+        category: allyUser.category
+      };
+    });
+
+    res.json({
+      message: 'Aliados obtenidos con éxito',
+      allies: formattedAllies
+    });
+  } catch (error) {
+    console.error('❌ Error al obtener aliados:', error);
+    res.status(500).json({ 
+      error: 'Error al obtener aliados',
+      message: error.message 
+    });
+  }
+});
+
+// 🔹 Verificar si dos usuarios son aliados
+router.get('/check/:targetUserId', verifyToken, async (req, res) => {
+  try {
+    const { targetUserId } = req.params;
+
+    const ally = await Ally.findOne({
+      $or: [
+        { user1: req.userId, user2: targetUserId },
+        { user1: targetUserId, user2: req.userId }
+      ]
+    });
+
+    res.json({
+      isAlly: !!ally
+    });
+  } catch (error) {
+    console.error('❌ Error al verificar aliado:', error);
+    res.status(500).json({ 
+      error: 'Error al verificar aliado',
+      message: error.message 
+    });
+  }
+});
+
 module.exports = router;
